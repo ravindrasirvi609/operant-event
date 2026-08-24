@@ -1,0 +1,1095 @@
+Perfect. Hum isko **proper production-grade SaaS project** ki tarah start karte hain.
+
+Main development ko random screens se start nahi karunga. Pehle **foundation + database + tenant architecture**, phir backend APIs, phir frontend.
+
+# Phase 1 — Database & Core Architecture
+
+Sabse pehle hum ye foundation build karenge:
+
+```text
+Platform
+   │
+   ├── Organizations
+   │      │
+   │      ├── Users
+   │      ├── Roles / Permissions
+   │      │
+   │      └── Conferences
+   │             │
+   │             ├── Tracks
+   │             ├── Abstracts
+   │             ├── Reviews
+   │             ├── Registrations
+   │             ├── Payments
+   │             ├── Sessions
+   │             ├── Speakers
+   │             ├── Attendance
+   │             └── Certificates
+   │
+   └── Platform Admin
+```
+
+## 1. Core tables
+
+First version mein main ye tables create karunga:
+
+```text
+organizations
+users
+roles
+permissions
+role_permissions
+user_roles
+
+conferences
+conference_settings
+conference_tracks
+
+abstracts
+abstract_versions
+authors
+abstract_authors
+
+reviewers
+reviewer_profiles
+review_assignments
+reviews
+
+abstract_decisions
+abstract_revisions
+
+registration_categories
+registration_types
+registrations
+
+orders
+order_items
+payments
+invoices
+
+sessions
+session_speakers
+presentation_assignments
+
+attendance
+checkins
+
+certificates
+
+files
+notifications
+email_templates
+audit_logs
+```
+
+---
+
+# 2. Tenant architecture
+
+Sabse pehle `organizations`:
+
+```text
+organizations
+────────────────────────
+id
+name
+slug
+logo
+website
+contact_email
+contact_phone
+status
+created_at
+updated_at
+```
+
+Example:
+
+```text
+APTICON
+Medical Society
+Pharma Association
+University
+```
+
+Har organization apne conferences manage karegi.
+
+---
+
+# 3. Users
+
+```text
+users
+────────────────────────
+id
+organization_id
+first_name
+last_name
+email
+mobile
+password_hash
+avatar
+status
+email_verified_at
+last_login_at
+created_at
+updated_at
+```
+
+Important:
+
+```text
+organization_id → organizations.id
+```
+
+---
+
+# 4. Roles & Permissions
+
+Roles ko hard-code nahi karenge.
+
+```text
+roles
+────────────────
+id
+organization_id
+name
+description
+```
+
+Permissions:
+
+```text
+permissions
+────────────────
+id
+module
+action
+```
+
+Example:
+
+```text
+conference.create
+conference.update
+conference.delete
+
+abstract.read
+abstract.review
+abstract.accept
+
+registration.read
+registration.manage
+
+payment.read
+payment.refund
+```
+
+Mapping:
+
+```text
+role_permissions
+────────────────
+role_id
+permission_id
+```
+
+Aur:
+
+```text
+user_roles
+────────────────
+user_id
+role_id
+```
+
+---
+
+# 5. Conference
+
+```text
+conferences
+────────────────────────────
+id
+organization_id
+name
+slug
+short_name
+description
+start_date
+end_date
+timezone
+venue_name
+venue_address
+city
+state
+country
+website
+contact_email
+logo_file_id
+banner_file_id
+status
+created_by
+created_at
+updated_at
+```
+
+Status:
+
+```text
+DRAFT
+OPEN
+REVIEW
+REGISTRATION
+ONGOING
+COMPLETED
+ARCHIVED
+```
+
+---
+
+# 6. Conference settings
+
+Configuration ko separate rakhenge.
+
+```text
+conference_settings
+────────────────────────────
+id
+conference_id
+
+abstract_enabled
+abstract_start_date
+abstract_end_date
+
+review_enabled
+review_mode
+
+registration_enabled
+registration_start_date
+registration_end_date
+
+payment_enabled
+certificate_enabled
+checkin_enabled
+
+created_at
+updated_at
+```
+
+Isse har conference independently configure hogi.
+
+---
+
+# 7. Conference Tracks
+
+Example:
+
+```text
+Conference
+   │
+   ├── Clinical Research
+   ├── AI in Healthcare
+   ├── Pharmacy Practice
+   └── Pharmaceutical Technology
+```
+
+Table:
+
+```text
+conference_tracks
+────────────────────────
+id
+conference_id
+name
+code
+description
+sort_order
+status
+```
+
+---
+
+# 8. Abstract architecture
+
+Main abstract ko directly overwrite nahi karunga.
+
+```text
+abstracts
+```
+
+contains current submission.
+
+```text
+abstracts
+────────────────────────
+id
+conference_id
+track_id
+submission_number
+title
+submission_type
+presentation_preference
+status
+submitted_by
+current_version_id
+submitted_at
+created_at
+updated_at
+```
+
+Then versions:
+
+```text
+abstract_versions
+────────────────────────
+id
+abstract_id
+version_number
+content
+form_data
+submitted_at
+submitted_by
+```
+
+This is important because:
+
+```text
+V1
+ ↓
+Reviewer Revision
+ ↓
+V2
+ ↓
+Revision
+ ↓
+V3
+```
+
+Old version kabhi destroy nahi hoga.
+
+---
+
+# 9. Authors
+
+```text
+authors
+────────────────────────
+id
+first_name
+last_name
+email
+mobile
+designation
+institution
+department
+city
+country
+created_at
+```
+
+Abstract-author relation:
+
+```text
+abstract_authors
+────────────────────────
+id
+abstract_id
+author_id
+author_order
+is_corresponding
+is_presenting
+```
+
+So one abstract can have 10+ authors.
+
+---
+
+# 10. Dynamic Abstract Form
+
+Ye feature later bahut powerful hoga.
+
+`conference_form_fields` jaisa table add karenge:
+
+```text
+conference_form_fields
+────────────────────────
+id
+conference_id
+section
+field_key
+label
+field_type
+is_required
+options_json
+validation_json
+sort_order
+status
+```
+
+Example:
+
+```text
+Background → rich_text
+Objective → textarea
+Research Type → dropdown
+Keywords → multi_select
+Supporting Document → file
+```
+
+Submitted data:
+
+```text
+abstract_versions.form_data
+```
+
+JSON mein.
+
+Isse organizer bina developer ke abstract form change kar sakega.
+
+---
+
+# 11. Review architecture
+
+Reviewer:
+
+```text
+reviewers
+────────────────
+id
+organization_id
+user_id
+status
+```
+
+Reviewer expertise:
+
+```text
+reviewer_profiles
+────────────────────────
+id
+reviewer_id
+institution
+designation
+bio
+expertise
+keywords
+```
+
+Assignment:
+
+```text
+review_assignments
+────────────────────────
+id
+conference_id
+abstract_id
+reviewer_id
+assigned_at
+due_date
+status
+conflict_of_interest
+```
+
+---
+
+# 12. Review
+
+```text
+reviews
+────────────────────────
+id
+assignment_id
+overall_score
+originality_score
+methodology_score
+quality_score
+significance_score
+comments_to_author
+private_comments
+recommendation
+submitted_at
+```
+
+Recommendation:
+
+```text
+ACCEPT
+REJECT
+MINOR_REVISION
+MAJOR_REVISION
+```
+
+---
+
+# 13. Decision
+
+Final decision reviewer ka direct result nahi hoga.
+
+Separate table:
+
+```text
+abstract_decisions
+────────────────────────
+id
+abstract_id
+decision
+reason
+decided_by
+decided_at
+```
+
+Possible:
+
+```text
+ACCEPTED
+REJECTED
+REVISION_REQUIRED
+WAITLISTED
+```
+
+This lets Track Chair or Conference Admin make the final decision.
+
+---
+
+# 14. Registration
+
+Registration category:
+
+```text
+registration_categories
+────────────────────────
+id
+conference_id
+name
+description
+```
+
+Example:
+
+```text
+Student
+Faculty
+Delegate
+Speaker
+VIP
+```
+
+Pricing:
+
+```text
+registration_types
+────────────────────────
+id
+category_id
+name
+price
+currency
+start_date
+end_date
+capacity
+```
+
+Example:
+
+```text
+Student Early Bird
+Student Regular
+Faculty Early Bird
+Faculty Regular
+```
+
+---
+
+# 15. Registration
+
+```text
+registrations
+────────────────────────
+id
+conference_id
+registration_number
+user_id
+registration_type_id
+status
+total_amount
+currency
+registered_at
+```
+
+Registration status:
+
+```text
+PENDING
+CONFIRMED
+CANCELLED
+REFUNDED
+CHECKED_IN
+```
+
+---
+
+# 16. Payment
+
+Order:
+
+```text
+orders
+────────────────
+id
+conference_id
+registration_id
+order_number
+subtotal
+discount
+tax
+total
+currency
+status
+```
+
+Items:
+
+```text
+order_items
+────────────────
+id
+order_id
+item_type
+reference_id
+description
+quantity
+unit_price
+total_price
+```
+
+Payment:
+
+```text
+payments
+────────────────
+id
+order_id
+provider
+provider_order_id
+provider_payment_id
+amount
+currency
+status
+paid_at
+```
+
+This structure Razorpay + Stripe dono support kar sakta hai.
+
+---
+
+# 17. Program / Sessions
+
+```text
+sessions
+────────────────────────
+id
+conference_id
+track_id
+title
+description
+room
+session_date
+start_time
+end_time
+session_type
+chair_id
+co_chair_id
+status
+```
+
+Presentation assignment:
+
+```text
+presentation_assignments
+────────────────────────
+id
+session_id
+abstract_id
+presentation_type
+start_time
+end_time
+sort_order
+```
+
+---
+
+# 18. Speakers
+
+```text
+speakers
+────────────────
+id
+conference_id
+user_id
+name
+designation
+institution
+bio
+photo_file_id
+country
+```
+
+Relation:
+
+```text
+session_speakers
+────────────────
+session_id
+speaker_id
+role
+```
+
+Roles:
+
+```text
+SPEAKER
+CHAIR
+CO_CHAIR
+KEYNOTE
+```
+
+---
+
+# 19. Attendance / Check-in
+
+```text
+checkins
+────────────────────────
+id
+conference_id
+registration_id
+checkin_type
+checked_in_at
+device_id
+```
+
+Examples:
+
+```text
+MAIN_EVENT
+WORKSHOP
+SESSION
+BANQUET
+```
+
+Attendance:
+
+```text
+attendance
+────────────────
+id
+conference_id
+registration_id
+session_id
+checked_in_at
+```
+
+---
+
+# 20. Certificates
+
+```text
+certificates
+────────────────────────
+id
+conference_id
+registration_id
+certificate_type
+certificate_number
+file_id
+verification_code
+issued_at
+status
+```
+
+Public verification:
+
+```text
+/verify/CERT-2026-000125
+```
+
+---
+
+# 21. Common infrastructure tables
+
+### Files
+
+```text
+files
+────────────────
+id
+organization_id
+file_name
+storage_key
+mime_type
+size
+bucket
+uploaded_by
+created_at
+```
+
+### Notifications
+
+```text
+notifications
+────────────────
+id
+organization_id
+user_id
+type
+title
+message
+data
+read_at
+created_at
+```
+
+### Audit
+
+```text
+audit_logs
+────────────────
+id
+organization_id
+user_id
+conference_id
+module
+action
+entity_type
+entity_id
+old_values
+new_values
+ip_address
+user_agent
+created_at
+```
+
+---
+
+# 22. Very important indexes
+
+Large conference mein thousands of abstracts ho sakte hain, so indexes early design karo:
+
+```text
+users
+  INDEX(organization_id, email)
+
+conferences
+  INDEX(organization_id, slug)
+
+abstracts
+  INDEX(conference_id, status)
+  INDEX(conference_id, track_id)
+  INDEX(submission_number)
+
+review_assignments
+  INDEX(reviewer_id, status)
+  INDEX(abstract_id)
+
+registrations
+  INDEX(conference_id, status)
+  INDEX(registration_number)
+
+payments
+  INDEX(order_id)
+  INDEX(provider_payment_id)
+
+audit_logs
+  INDEX(organization_id, created_at)
+  INDEX(conference_id, created_at)
+```
+
+---
+
+# 23. Tenant isolation
+
+Ye rule hum backend mein mandatory rakhenge:
+
+```text
+Request
+   ↓
+Authenticated User
+   ↓
+Organization Context
+   ↓
+Conference Access Check
+   ↓
+Database Query
+```
+
+Example:
+
+```text
+GET /conferences/:conferenceId/abstracts
+```
+
+Backend blindly:
+
+```sql
+SELECT * FROM abstracts
+WHERE conference_id = ?
+```
+
+nahi karega.
+
+Pehle check:
+
+```text
+conference belongs to current organization?
+        ↓
+       YES
+        ↓
+query abstracts
+```
+
+---
+
+# 24. Tech project structure
+
+Ab actual project:
+
+```text
+conference-saas/
+│
+├── apps/
+│   ├── web/
+│   ├── api/
+│   └── worker/
+│
+├── packages/
+│   ├── ui/
+│   ├── types/
+│   ├── validation/
+│   └── config/
+│
+├── infrastructure/
+│   ├── docker/
+│   └── scripts/
+│
+├── docs/
+│
+├── package.json
+└── README.md
+```
+
+Main ise **monorepo** rakhunga.
+
+```text
+web    → Next.js
+api    → NestJS
+worker → BullMQ workers
+```
+
+---
+
+# 25. Development order
+
+Ab actual build sequence ye rahega:
+
+```text
+PHASE 1
+───────
+Project Setup
+Database
+Prisma
+Authentication
+Organization
+RBAC
+
+PHASE 2
+───────
+Conference
+Conference Settings
+Tracks
+Dynamic Abstract Form
+
+PHASE 3
+───────
+Abstract Submission
+Authors
+Versions
+Reviewer Management
+
+PHASE 4
+───────
+Review
+Assignment
+Conflict of Interest
+Decision
+Revision
+
+PHASE 5
+───────
+Registration
+Pricing
+Orders
+Razorpay
+Invoices
+
+PHASE 6
+───────
+Program
+Sessions
+Speakers
+Presentations
+
+PHASE 7
+───────
+QR
+Check-in
+Attendance
+Certificates
+
+PHASE 8
+───────
+Reports
+Analytics
+Notifications
+Audit Logs
+
+PHASE 9
+───────
+AI
+Mobile App
+Advanced Automation
+```
+
+## Phase 1 ka first deliverable
+
+Ab hum **actual coding foundation** par ja sakte hain:
+
+```text
+Next.js
+       +
+NestJS
+       +
+PostgreSQL
+       +
+Prisma
+       +
+Redis
+       +
+Docker
+       +
+GitHub
+```
+
+Aur Phase 1 mein main pehle ye 7 entities implement karunga:
+
+```text
+Organization
+User
+Role
+Permission
+RolePermission
+UserRole
+Conference
+```
+
+Uske baad authentication + organization onboarding + RBAC ready ho jayega. Phir isi foundation ke upar Abstract module build karna safe rahega.

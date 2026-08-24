@@ -1,0 +1,1647 @@
+Bilkul. Ye actually ek **strong vertical SaaS product** ban sakta hai:
+
+> **Conference & Event Management SaaS**
+> Abstract Submission + Peer Review + Acceptance + Registration + Payment + Scheduling + Certificates + Check-in + Reporting
+
+Is type ka system tum ek single conference ke liye nahi, balki **multiple conferences / societies / organizers** ke liye SaaS bana sakte ho.
+
+---
+
+# 1. Product ka overall vision
+
+Ek organizer login karega:
+
+```text
+Organizer
+   ↓
+Create Conference
+   ↓
+Configure Conference
+   ↓
+Abstract Submission Open
+   ↓
+Authors Submit Abstract
+   ↓
+Reviewer Assignment
+   ↓
+Review
+   ↓
+Accept / Reject / Revision
+   ↓
+Registration
+   ↓
+Payment
+   ↓
+Program / Session / Schedule
+   ↓
+On-site Check-in
+   ↓
+Certificate
+   ↓
+Reports / Analytics
+```
+
+Aur sabse important:
+
+```text
+One SaaS
+   │
+   ├── Conference A
+   ├── Conference B
+   ├── Conference C
+   └── Conference D
+```
+
+Har conference ka data isolated rahega.
+
+---
+
+# 2. Main user types
+
+System mein roughly ye roles hone chahiye:
+
+### Platform Level
+
+```text
+Super Admin
+```
+
+Tumhare SaaS ka master admin.
+
+### Organization Level
+
+```text
+Organization Owner
+Organization Admin
+Conference Manager
+Finance Manager
+```
+
+### Conference Level
+
+```text
+Conference Admin
+Track Chair
+Reviewer
+Session Chair
+Volunteer
+Registration Staff
+```
+
+### External Users
+
+```text
+Author
+Co-Author
+Attendee
+Speaker
+Sponsor
+Exhibitor
+```
+
+---
+
+# 3. Multi-tenant SaaS structure
+
+Ye sabse important architecture hai.
+
+```text
+Platform
+│
+├── Organization 1
+│   ├── Conference A
+│   ├── Conference B
+│   └── Conference C
+│
+├── Organization 2
+│   ├── Conference D
+│   └── Conference E
+│
+└── Organization 3
+    └── Conference F
+```
+
+For example:
+
+```text
+APTICON
+   ├── APTICON 2026
+   └── APTICON 2027
+
+Medical Society
+   ├── Annual Conference 2026
+   └── Workshop 2026
+```
+
+Har business table mein generally:
+
+```text
+organization_id
+conference_id
+```
+
+hona chahiye where applicable.
+
+---
+
+# 4. Main modules
+
+Main platform ko approximately **18 major modules** mein divide karunga.
+
+```text
+1. SaaS / Organization Management
+2. User & Role Management
+3. Conference Management
+4. Abstract Management
+5. Author Management
+6. Reviewer Management
+7. Review Management
+8. Acceptance / Revision
+9. Registration Management
+10. Payment & Billing
+11. Program Management
+12. Session Management
+13. Speaker Management
+14. Attendance / Check-in
+15. Certificate Management
+16. Sponsor / Exhibitor Management
+17. Communication / Notifications
+18. Reports & Analytics
+```
+
+---
+
+# 5. Conference Management
+
+Organizer conference create karega.
+
+Example:
+
+```text
+Conference
+────────────────────────
+Name
+Short Name
+Description
+Start Date
+End Date
+Venue
+City
+Country
+Timezone
+Website
+Contact Email
+Contact Phone
+Logo
+Banner
+Status
+```
+
+Conference statuses:
+
+```text
+DRAFT
+UPCOMING
+OPEN
+ONGOING
+COMPLETED
+ARCHIVED
+```
+
+---
+
+# 6. Conference configuration
+
+Har conference configurable honi chahiye.
+
+For example:
+
+```text
+Abstract Submission
+    Enable
+    Start Date
+    End Date
+
+Review
+    Double Blind
+    Single Blind
+    Open Review
+
+Registration
+    Enable
+    Start Date
+    End Date
+
+Payment
+    Enable
+
+Certificate
+    Enable
+
+Check-in
+    Enable
+```
+
+Isse same SaaS ko different conferences mein reuse kar sakte ho.
+
+---
+
+# 7. Abstract Management
+
+Ye tumhare product ka **core module** hoga.
+
+Author:
+
+```text
+Create Abstract
+        ↓
+Select Track
+        ↓
+Add Authors
+        ↓
+Enter Abstract Content
+        ↓
+Keywords
+        ↓
+Upload File
+        ↓
+Submit
+```
+
+Abstract structure:
+
+```text
+Abstract
+───────────────
+ID
+Conference
+Track
+Title
+Background
+Objective
+Methods
+Results
+Conclusion
+Keywords
+Submission Type
+Presentation Preference
+Status
+```
+
+Submission type:
+
+```text
+ORAL
+POSTER
+E_POSTER
+WORKSHOP
+SYMPOSIUM
+```
+
+---
+
+# 8. Dynamic Abstract Form Builder
+
+Ye tumhare SaaS ka powerful feature ho sakta hai.
+
+Organizer fixed form ke instead fields configure kare:
+
+```text
++ Add Field
+
+Title
+Abstract
+Keywords
+Research Type
+Institution
+Funding Source
+Conflict of Interest
+File Upload
+Presentation Preference
+```
+
+Field types:
+
+```text
+Text
+Textarea
+Rich Text
+Number
+Date
+Dropdown
+Radio
+Checkbox
+Multi Select
+File Upload
+URL
+```
+
+Example:
+
+```text
+Conference A
+
+Abstract Form:
+ ├── Title
+ ├── Background
+ ├── Objectives
+ ├── Methods
+ ├── Results
+ ├── Conclusion
+ └── Keywords
+```
+
+Conference B:
+
+```text
+ ├── Title
+ ├── Introduction
+ ├── Case Description
+ ├── Learning Objectives
+ ├── Clinical Relevance
+ └── References
+```
+
+Iske liye **JSON-based form schema** use karna very useful rahega.
+
+---
+
+# 9. Author & Co-Author Management
+
+Abstract mein:
+
+```text
+Primary Author
+Co-Authors
+Corresponding Author
+Presenting Author
+```
+
+Example:
+
+```text
+Abstract #A-1024
+
+Author:
+Dr. Rahul Sharma
+
+Co-Authors:
+Dr. Amit Patel
+Dr. Priya Singh
+Dr. Karan Mehta
+
+Presenting Author:
+Dr. Rahul Sharma
+```
+
+Institution affiliations bhi support karo.
+
+---
+
+# 10. Abstract workflow
+
+Mera recommended workflow:
+
+```text
+DRAFT
+   ↓
+SUBMITTED
+   ↓
+SCREENING
+   ↓
+UNDER_REVIEW
+   ↓
+REVISION_REQUIRED
+   ↓
+RESUBMITTED
+   ↓
+ACCEPTED
+   │
+   ├── ORAL
+   ├── POSTER
+   └── E-POSTER
+   ↓
+SCHEDULED
+   ↓
+PRESENTED
+```
+
+Reject:
+
+```text
+UNDER_REVIEW
+      ↓
+   REJECTED
+```
+
+---
+
+# 11. Review Management
+
+Reviewer ko abstracts assign karne hain.
+
+```text
+Abstract
+   ↓
+Track
+   ↓
+Reviewer Pool
+   ↓
+Assignment
+```
+
+Assignment algorithms:
+
+```text
+Manual Assignment
+Automatic Assignment
+Track-based Assignment
+Keyword-based Assignment
+Conflict-of-interest filtering
+```
+
+---
+
+# 12. Blind review
+
+Medical/scientific conference ke liye very important:
+
+### Single Blind
+
+```text
+Reviewer knows Author
+Author doesn't know Reviewer
+```
+
+### Double Blind
+
+```text
+Reviewer doesn't know Author
+Author doesn't know Reviewer
+```
+
+System mein:
+
+```text
+review_mode:
+SINGLE_BLIND
+DOUBLE_BLIND
+OPEN
+```
+
+Frontend automatically sensitive information hide kar sake.
+
+---
+
+# 13. Reviewer scoring system
+
+Reviewer configurable score दे सके:
+
+```text
+Scientific Quality       1-5
+Originality              1-5
+Methodology              1-5
+Significance              1-5
+Presentation Quality      1-5
+```
+
+Then:
+
+```text
+Total Score
+Average Score
+Recommendation
+```
+
+Recommendation:
+
+```text
+ACCEPT
+REJECT
+MINOR_REVISION
+MAJOR_REVISION
+```
+
+---
+
+# 14. Conflict of Interest
+
+Reviewer assignment mein:
+
+```text
+Reviewer
+      ↓
+Check:
+ ├── Same Institution?
+ ├── Same Author?
+ ├── Previous Collaboration?
+ └── Declared Conflict?
+```
+
+Agar conflict hai:
+
+```text
+DO NOT ASSIGN
+```
+
+Ye feature product ko much more professional bana dega.
+
+---
+
+# 15. Revision workflow
+
+Reviewer bole:
+
+> Please revise methodology section.
+
+System:
+
+```text
+Review
+ ↓
+Revision Required
+ ↓
+Author Notification
+ ↓
+Author submits Revision
+ ↓
+Reviewer Re-review
+ ↓
+Final Decision
+```
+
+Versioning bhi rakho:
+
+```text
+Abstract V1
+Abstract V2
+Abstract V3
+```
+
+Old versions delete nahi honge.
+
+---
+
+# 16. Acceptance Management
+
+Acceptance ke baad system automatically:
+
+```text
+Accepted
+   ↓
+Acceptance Letter
+   ↓
+Registration Required
+   ↓
+Registration Deadline
+   ↓
+Payment
+   ↓
+Presentation Assignment
+```
+
+Acceptance email/letter automatically generate ho sakta hai.
+
+---
+
+# 17. Registration Management
+
+Registration ko separate powerful module rakho.
+
+Registration types:
+
+```text
+Delegate
+Student
+Faculty
+Research Scholar
+Author
+Speaker
+VIP
+Sponsor
+Exhibitor
+Workshop Participant
+```
+
+Pricing:
+
+```text
+Early Bird
+Regular
+Late
+On-site
+```
+
+Example:
+
+```text
+Student
+Early Bird     ₹2,000
+Regular        ₹2,500
+Late           ₹3,000
+
+Faculty
+Early Bird     ₹4,000
+Regular        ₹5,000
+Late           ₹6,000
+```
+
+---
+
+# 18. Registration Form Builder
+
+Exactly abstract form ki tarah.
+
+```text
+Name
+Email
+Mobile
+Institution
+Designation
+Address
+GST Number
+Dietary Preference
+Accommodation
+Workshop
+```
+
+Organizer custom fields add kar sake.
+
+---
+
+# 19. Add-ons
+
+Registration ke saath:
+
+```text
+Registration
++
+Workshop
++
+Banquet
++
+Accommodation
++
+Airport Pickup
++
+Lunch
+```
+
+Example:
+
+```text
+Registration           ₹5,000
+Workshop               ₹1,500
+Accommodation          ₹4,000
+Banquet                ₹1,000
+──────────────────────────
+Total                  ₹11,500
+```
+
+---
+
+# 20. Payment Architecture
+
+For India:
+
+```text
+Razorpay
+```
+
+International:
+
+```text
+Stripe
+```
+
+Flow:
+
+```text
+Registration
+      ↓
+Create Order
+      ↓
+Payment Gateway
+      ↓
+Payment
+      ↓
+Webhook
+      ↓
+Verify Payment
+      ↓
+Registration Confirmed
+      ↓
+Invoice Generated
+```
+
+Important:
+
+**frontend success callback ko final payment truth mat samajhna.**
+
+Webhook se payment confirm karo.
+
+---
+
+# 21. Invoice
+
+Registration successful hone par:
+
+```text
+Invoice
+────────────────
+Invoice Number
+Registration ID
+Participant
+Conference
+Items
+Tax
+Discount
+Total
+Payment Status
+```
+
+PDF automatically generate ho sakti hai.
+
+---
+
+# 22. Program Management
+
+Abstract accepted hone ke baad next major module:
+
+```text
+Program
+```
+
+Example:
+
+```text
+Day 1
+────────────────
+09:00 Opening Ceremony
+
+10:00 Session A
+      Abstract #102
+      Abstract #110
+
+11:30 Tea Break
+
+12:00 Session B
+      Abstract #120
+      Abstract #121
+```
+
+---
+
+# 23. Session Management
+
+Session:
+
+```text
+Session
+──────────────
+Title
+Track
+Room
+Date
+Start Time
+End Time
+Chair
+Co-Chair
+```
+
+Abstracts assign:
+
+```text
+Session
+   ↓
+Presentations
+```
+
+---
+
+# 24. Speaker Management
+
+Speaker profile:
+
+```text
+Name
+Photo
+Designation
+Institution
+Bio
+Country
+Email
+Social Links
+```
+
+Speaker dashboard:
+
+```text
+My Sessions
+My Presentations
+Travel Information
+Accommodation
+Documents
+Certificates
+```
+
+---
+
+# 25. QR Code Registration
+
+Every participant ko:
+
+```text
+Registration QR
+```
+
+generate karo.
+
+On-site:
+
+```text
+QR Scan
+   ↓
+Find Registration
+   ↓
+Check-in
+   ↓
+Badge Printed
+```
+
+This can make the system much more useful during actual events.
+
+---
+
+# 26. Attendance
+
+Track:
+
+```text
+Registered
+Checked In
+Session Attendance
+Workshop Attendance
+Banquet Attendance
+```
+
+Example:
+
+```text
+Participant
+   ↓
+Main Event Check-in
+   ↓
+Session A
+   ↓
+Workshop
+```
+
+---
+
+# 27. Badge Printing
+
+Very useful operational feature.
+
+```text
+┌─────────────────────────┐
+│        APTICON 2026     │
+│                         │
+│     RAHUL SHARMA        │
+│                         │
+│   SPEAKER               │
+│   AIIMS Delhi           │
+│                         │
+│     [ QR CODE ]         │
+└─────────────────────────┘
+```
+
+Badge templates configurable rakho.
+
+---
+
+# 28. Certificate Management
+
+Automatically generate:
+
+```text
+Participation Certificate
+Presentation Certificate
+Speaker Certificate
+Reviewer Certificate
+Chairperson Certificate
+Volunteer Certificate
+Workshop Certificate
+```
+
+Example:
+
+```text
+Participant
+      ↓
+Attendance ≥ required threshold
+      ↓
+Certificate eligible
+      ↓
+Generate PDF
+      ↓
+Unique Certificate ID
+      ↓
+QR Verification
+```
+
+Public verification page:
+
+```text
+conference.com/verify/CERT-2026-000123
+```
+
+---
+
+# 29. Email / Notification System
+
+Events mein notifications bahut important hain.
+
+Types:
+
+```text
+Abstract Submitted
+Abstract Received
+Reviewer Assigned
+Review Due
+Revision Required
+Abstract Accepted
+Abstract Rejected
+Registration Successful
+Payment Successful
+Payment Failed
+Session Assigned
+Event Reminder
+Certificate Available
+```
+
+Channels:
+
+```text
+Email
+SMS
+WhatsApp
+In-App
+```
+
+Email templates admin configurable rakho.
+
+---
+
+# 30. Sponsor & Exhibitor Module
+
+Future monetization ke liye excellent module.
+
+```text
+Sponsor
+   ↓
+Platinum
+Gold
+Silver
+Bronze
+```
+
+Exhibitor:
+
+```text
+Company
+Booth Number
+Contact Person
+Payment
+Documents
+Staff
+```
+
+---
+
+# 31. Analytics Dashboard
+
+Organizer dashboard:
+
+```text
+Total Abstracts       1,245
+Under Review            320
+Accepted                680
+Rejected                180
+
+Registrations          2,450
+Paid                   2,210
+Pending                  240
+
+Revenue              ₹82.5L
+
+Check-ins             1,870
+```
+
+Charts:
+
+```text
+Abstract submission trend
+Review completion
+Acceptance ratio
+Registration trend
+Revenue
+Country distribution
+Institution distribution
+```
+
+---
+
+# 32. Core Database Architecture
+
+Main entities:
+
+```text
+organizations
+users
+roles
+permissions
+
+conferences
+conference_settings
+conference_tracks
+
+abstracts
+abstract_versions
+abstract_authors
+abstract_keywords
+
+reviewers
+reviewer_profiles
+review_assignments
+reviews
+
+decisions
+revisions
+
+registrations
+registration_types
+registration_categories
+
+orders
+payments
+invoices
+
+sessions
+session_tracks
+session_speakers
+presentation_assignments
+
+attendance
+checkins
+
+certificates
+
+speakers
+sponsors
+exhibitors
+
+notifications
+email_templates
+
+files
+audit_logs
+```
+
+---
+
+# 33. Important relationships
+
+```text
+Organization
+   │
+   └── Conferences
+          │
+          ├── Tracks
+          │
+          ├── Abstracts
+          │      │
+          │      ├── Authors
+          │      ├── Reviews
+          │      ├── Decisions
+          │      └── Versions
+          │
+          ├── Registrations
+          │
+          ├── Sessions
+          │      │
+          │      └── Presentations
+          │
+          ├── Speakers
+          │
+          ├── Sponsors
+          │
+          └── Certificates
+```
+
+---
+
+# 34. Recommended technical architecture
+
+Tumhare use-case ke liye main ye stack choose karunga:
+
+```text
+Frontend
+────────────
+Next.js
+TypeScript
+Tailwind
+shadcn/ui
+React Hook Form
+Zod
+TanStack Query
+
+Backend
+────────────
+NestJS
+TypeScript
+REST API
+Swagger
+
+Database
+────────────
+PostgreSQL
+Prisma
+
+Infrastructure
+────────────
+Redis
+BullMQ
+S3 / Cloudflare R2
+
+Payments
+────────────
+Razorpay
+Stripe
+
+Email
+────────────
+Resend / AWS SES
+
+Monitoring
+────────────
+Sentry
+
+Deployment
+────────────
+Vercel
+AWS / Railway initially
+Docker
+GitHub Actions
+Cloudflare
+```
+
+---
+
+# 35. Backend architecture
+
+Main NestJS structure:
+
+```text
+src/
+│
+├── auth/
+├── users/
+├── organizations/
+├── roles/
+├── permissions/
+│
+├── conferences/
+├── conference-settings/
+├── tracks/
+│
+├── abstracts/
+├── authors/
+├── reviewers/
+├── reviews/
+├── decisions/
+├── revisions/
+│
+├── registrations/
+├── pricing/
+├── orders/
+├── payments/
+├── invoices/
+│
+├── sessions/
+├── presentations/
+├── speakers/
+│
+├── attendance/
+├── checkins/
+├── certificates/
+│
+├── sponsors/
+├── exhibitors/
+│
+├── notifications/
+├── email/
+├── files/
+├── reports/
+├── audit/
+│
+├── common/
+│   ├── guards/
+│   ├── decorators/
+│   ├── filters/
+│   ├── interceptors/
+│   └── utils/
+│
+└── main.ts
+```
+
+---
+
+# 36. Frontend architecture
+
+```text
+app/
+│
+├── login/
+├── register/
+│
+├── dashboard/
+│
+├── conferences/
+│   ├── [id]/
+│   │   ├── overview/
+│   │   ├── abstracts/
+│   │   ├── reviewers/
+│   │   ├── registrations/
+│   │   ├── payments/
+│   │   ├── program/
+│   │   ├── speakers/
+│   │   ├── certificates/
+│   │   ├── sponsors/
+│   │   └── reports/
+│
+├── submissions/
+├── registration/
+├── profile/
+│
+└── verify/
+```
+
+---
+
+# 37. Public website + Admin + Participant portal
+
+Main mistake ye hoga ki sab kuch ek hi UI mein bana do.
+
+Actually **3 separate experiences** rakho:
+
+### Public Website
+
+```text
+conference.com
+```
+
+Contains:
+
+```text
+Home
+About
+Important Dates
+Call for Abstracts
+Registration
+Program
+Speakers
+Sponsors
+Venue
+Contact
+```
+
+### Organizer Portal
+
+```text
+app.conference.com
+```
+
+Contains:
+
+```text
+Dashboard
+Conference Setup
+Abstracts
+Reviews
+Registrations
+Payments
+Program
+Certificates
+Reports
+Settings
+```
+
+### Participant Portal
+
+```text
+participant
+```
+
+Contains:
+
+```text
+My Abstracts
+My Reviews
+My Registration
+My Payment
+My Schedule
+My Certificates
+My Profile
+```
+
+---
+
+# 38. SaaS subscription model
+
+Tum apne actual customers se charge kar sakte ho.
+
+Example:
+
+### Starter
+
+```text
+₹15,000 / Conference
+```
+
+### Professional
+
+```text
+₹40,000 / Conference
+```
+
+### Enterprise
+
+```text
+Custom
+```
+
+Ya monthly:
+
+```text
+Basic
+₹2,999/month
+
+Professional
+₹9,999/month
+
+Enterprise
+Custom
+```
+
+Aur usage-based pricing:
+
+```text
+Number of abstracts
+Number of registrations
+Number of reviewers
+Email volume
+Storage
+```
+
+---
+
+# 39. MVP kaise banana chahiye
+
+Sab kuch ek saath banana mistake hogi.
+
+Main MVP ko:
+
+### Phase 1
+
+```text
+Authentication
+Organization
+Conference
+Tracks
+Abstract Submission
+Author Management
+Reviewer Management
+Review
+Acceptance
+```
+
+### Phase 2
+
+```text
+Registration
+Pricing
+Payment
+Invoice
+Email Notifications
+```
+
+### Phase 3
+
+```text
+Program
+Sessions
+Speakers
+QR Check-in
+Attendance
+```
+
+### Phase 4
+
+```text
+Certificates
+Sponsors
+Exhibitors
+Analytics
+Advanced Reporting
+```
+
+### Phase 5
+
+```text
+Mobile App
+WhatsApp
+AI features
+Advanced automation
+```
+
+---
+
+# 40. Ek very important feature — Conference Lifecycle
+
+System ko dates ke basis par state-driven banana chahiye:
+
+```text
+Conference Created
+        ↓
+Planning
+        ↓
+Abstract Open
+        ↓
+Submission Closed
+        ↓
+Review Open
+        ↓
+Decision Released
+        ↓
+Registration Open
+        ↓
+Registration Closed
+        ↓
+Program Published
+        ↓
+Conference Live
+        ↓
+Conference Completed
+        ↓
+Certificates
+        ↓
+Archived
+```
+
+Is lifecycle ko central engine bana sakte ho.
+
+---
+
+# 41. Future mein AI bhi add kar sakte ho
+
+Ye SaaS ka strong differentiator ho sakta hai.
+
+### AI Abstract Screening
+
+```text
+Abstract
+ ↓
+AI
+ ↓
+Quality Check
+ ↓
+Missing Sections
+ ↓
+Keyword Suggestion
+ ↓
+Potential Track
+```
+
+### Reviewer Recommendation
+
+```text
+Abstract
+ ↓
+Keywords
+ ↓
+Reviewer Expertise
+ ↓
+Match Score
+ ↓
+Suggested Reviewers
+```
+
+### Duplicate Detection
+
+```text
+New Abstract
+ ↓
+Similarity Search
+ ↓
+Potential Duplicate
+```
+
+### AI Program Generation
+
+```text
+Accepted Abstracts
+        ↓
+AI clustering
+        ↓
+Suggested Sessions
+        ↓
+Suggested Schedule
+```
+
+AI ko **decision maker** nahi, recommendation system ki tarah use karna better hoga.
+
+---
+
+# 42. Final architecture
+
+```text
+                         INTERNET
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Cloudflare/WAF  │
+                    └────────┬────────┘
+                             │
+             ┌───────────────┴───────────────┐
+             │                               │
+             ▼                               ▼
+     ┌─────────────────┐            ┌─────────────────┐
+     │ Public Website  │            │ SaaS Dashboard  │
+     │    Next.js      │            │    Next.js      │
+     └────────┬────────┘            └────────┬────────┘
+              │                              │
+              └──────────────┬───────────────┘
+                             ▼
+                    ┌─────────────────┐
+                    │     NestJS      │
+                    │  Modular API    │
+                    └────────┬────────┘
+                             │
+       ┌─────────────────────┼─────────────────────┐
+       │                     │                     │
+       ▼                     ▼                     ▼
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│ PostgreSQL   │      │    Redis     │      │   S3 / R2    │
+│              │      │              │      │              │
+│ Core Data    │      │ Cache        │      │ Files        │
+│ Tenants      │      │ Queue        │      │ Abstracts    │
+│ Reviews      │      │ Jobs         │      │ Certificates │
+│ Payments     │      │ Rate Limit   │      │ Documents    │
+└──────────────┘      └──────┬───────┘      └──────────────┘
+                             │
+                             ▼
+                       ┌────────────┐
+                       │  BullMQ    │
+                       │  Workers   │
+                       └─────┬──────┘
+                             │
+               ┌─────────────┼─────────────┐
+               ▼             ▼             ▼
+             Email        Reports       Notifications
+```
+
+## मेरी strongest recommendation
+
+Is project ko **"Conference Management Software"** ke roop mein mat socho. Isko:
+
+> **Multi-tenant Conference & Event Operating System**
+
+ke roop mein architect karo.
+
+Tumhare core domain ke 4 pillars hone chahiye:
+
+```text
+ABSTRACT
+   ↓
+REVIEW
+   ↓
+REGISTRATION
+   ↓
+EVENT OPERATIONS
+```
+
+Aur inke upar:
+
+```text
+Multi-tenancy
+RBAC
+Billing
+Notifications
+Audit Logs
+Analytics
+```
+
+Ye structure banane ke baad tum **APTICON, medical conferences, academic conferences, pharma events, association events, workshops, seminars** sabko same platform par onboard kar sakte ho.
+
+**Next logical step:** sabse pehle database ko properly design karna chahiye. Main is system ka **complete PostgreSQL ERD + 40–50 tables ka schema + relationships + primary/foreign keys + indexes + tenant isolation strategy** design karunga, kyunki poore SaaS ki foundation wahi hogi.
