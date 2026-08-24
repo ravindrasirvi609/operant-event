@@ -1645,3 +1645,18 @@ Analytics
 Ye structure banane ke baad tum **APTICON, medical conferences, academic conferences, pharma events, association events, workshops, seminars** sabko same platform par onboard kar sakte ho.
 
 **Next logical step:** sabse pehle database ko properly design karna chahiye. Main is system ka **complete PostgreSQL ERD + 40–50 tables ka schema + relationships + primary/foreign keys + indexes + tenant isolation strategy** design karunga, kyunki poore SaaS ki foundation wahi hogi.
+
+
+Frontend       → Next.js + TypeScript
+UI             → Tailwind + shadcn/ui
+Backend        → NestJS + TypeScript
+Database       → PostgreSQL
+ORM            → Prisma
+Cache          → Redis
+Jobs           → BullMQ
+Storage        → Cloudflare R2
+Auth           → We can initially build our own RBAC/Auth module
+Payments       → Razorpay + Stripe later
+Email          → Resend 
+Monitoring     → Sentry
+Deployment     → Vercel + AWS
