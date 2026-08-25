@@ -12,6 +12,8 @@ import { TracksModule } from './tracks/tracks.module';
 import { FilesModule } from './files/files.module';
 import { ConferenceFormFieldsModule } from './conference-form-fields/conference-form-fields.module';
 import { AbstractsModule } from './abstracts/abstracts.module';
+import { ReviewersModule } from './reviewers/reviewers.module';
+import { DecisionsModule } from './decisions/decisions.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { AbstractsModule } from './abstracts/abstracts.module';
     FilesModule,
     ConferenceFormFieldsModule,
     AbstractsModule,
+    ReviewersModule,
+    DecisionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

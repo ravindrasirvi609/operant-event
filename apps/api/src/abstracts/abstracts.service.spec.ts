@@ -241,6 +241,34 @@ describe('AbstractsService.submit', () => {
     currentVersionId: 'version-1',
   };
 
+  it('resubmits a REVISION_REQUIRED abstract as RESUBMITTED, keeping its existing submission number', async () => {
+    const update = jest
+      .fn()
+      .mockResolvedValue({ id: 'abs-1', status: 'RESUBMITTED' });
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ ...draftAbstract, status: 'REVISION_REQUIRED' }),
+        update,
+      },
+      abstractVersion: {
+        findFirst: jest.fn().mockResolvedValue({ formData: { title: 'x' } }),
+      },
+      conferenceSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      conferenceFormField: {
+        findMany: jest.fn().mockResolvedValue([titleField]),
+      },
+    });
+
+    await new AbstractsService(prisma).submit('user-1', 'abs-1', false);
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'abs-1' },
+      data: { status: 'RESUBMITTED', submittedAt: expect.any(Date) },
+    });
+  });
+
   it('rejects submitting an abstract with no saved version yet', async () => {
     const prisma = fakePrisma({
       abstract: {

@@ -7,6 +7,9 @@ export const PERMISSIONS = {
   CONFERENCE_UPDATE: 'conference.update',
   ABSTRACT_READ: 'abstract.read',
   ABSTRACT_OVERRIDE_DEADLINE: 'abstract.override_deadline',
+  REVIEWER_MANAGE: 'reviewer.manage',
+  REVIEW_ASSIGNMENT_MANAGE: 'review_assignment.manage',
+  DECISION_RECORD: 'decision.record',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -21,6 +24,9 @@ export const PERMISSION_CATALOGUE: Array<{ module: string; action: string }> = [
   { module: 'conference', action: 'update' },
   { module: 'abstract', action: 'read' },
   { module: 'abstract', action: 'override_deadline' },
+  { module: 'reviewer', action: 'manage' },
+  { module: 'review_assignment', action: 'manage' },
+  { module: 'decision', action: 'record' },
 ];
 
 export interface SystemRoleDefinition {
@@ -44,6 +50,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_UPDATE,
       PERMISSIONS.ABSTRACT_READ,
       PERMISSIONS.ABSTRACT_OVERRIDE_DEADLINE,
+      PERMISSIONS.REVIEWER_MANAGE,
+      PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE,
+      PERMISSIONS.DECISION_RECORD,
     ],
   },
   {
@@ -58,6 +67,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_UPDATE,
       PERMISSIONS.ABSTRACT_READ,
       PERMISSIONS.ABSTRACT_OVERRIDE_DEADLINE,
+      PERMISSIONS.REVIEWER_MANAGE,
+      PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE,
+      PERMISSIONS.DECISION_RECORD,
     ],
   },
   {
@@ -68,6 +80,18 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_READ,
       PERMISSIONS.CONFERENCE_UPDATE,
       PERMISSIONS.ABSTRACT_READ,
+    ],
+  },
+  {
+    name: 'Track Chair',
+    description:
+      'Reviewer assignment, review oversight and decisions for assigned tracks (SRS §8).',
+    permissions: [
+      PERMISSIONS.CONFERENCE_READ,
+      PERMISSIONS.ABSTRACT_READ,
+      PERMISSIONS.REVIEWER_MANAGE,
+      PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE,
+      PERMISSIONS.DECISION_RECORD,
     ],
   },
 ];

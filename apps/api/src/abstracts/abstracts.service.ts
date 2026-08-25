@@ -15,7 +15,7 @@ import type { CreateAbstractDto } from './dto/create-abstract.dto';
 import type { SaveVersionDto } from './dto/save-version.dto';
 import type { AuthorInputDto } from './dto/set-authors.dto';
 
-const EDITABLE_STATUSES = new Set(['DRAFT']);
+const EDITABLE_STATUSES = new Set(['DRAFT', 'REVISION_REQUIRED']);
 const WITHDRAWABLE_STATUSES = new Set([
   'DRAFT',
   'SUBMITTED',
@@ -200,6 +200,16 @@ export class AbstractsService {
     );
     if (errors.length > 0) {
       throw new BadRequestException(errors);
+    }
+
+    // A resubmission keeps its existing submission number — it's the same
+    // slot, just revised content — and only a first-time submit needs one
+    // assigned.
+    if (abstract.status === 'REVISION_REQUIRED') {
+      return this.prisma.abstract.update({
+        where: { id: abstract.id },
+        data: { status: 'RESUBMITTED', submittedAt: new Date() },
+      });
     }
 
     return this.assignSubmissionNumberAndSubmit(

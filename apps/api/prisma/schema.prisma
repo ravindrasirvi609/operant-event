@@ -63,6 +63,7 @@ model Organization {
   conferences  Conference[]
   files        File[]
   auditLogs    AuditLog[]
+  reviewers    Reviewer[]
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
 
@@ -363,6 +364,9 @@ model Abstract {
   track                  ConferenceTrack? @relation(fields: [trackId], references: [id])
   versions               AbstractVersion[]
   authors                AbstractAuthor[]
+  reviewAssignments      ReviewAssignment[]
+  decisions              AbstractDecision[]
+  revisionRequests       AbstractRevisionRequest[]
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -415,4 +419,123 @@ model AbstractAuthor {
   @@unique([abstractId, authorId])
   @@index([abstractId])
   @@map("abstract_authors")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Reviewer Management, Assignments, Reviews, Decisions
+// Spec: docs/plans/03-review-management.md
+// ---------------------------------------------------------------------------
+
+enum ReviewAssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  OVERDUE
+  CANCELLED
+}
+
+enum ReviewRecommendation {
+  ACCEPT
+  REJECT
+  MINOR_REVISION
+  MAJOR_REVISION
+}
+
+enum AbstractDecisionType {
+  ACCEPTED
+  REJECTED
+  REVISION_REQUIRED
+  WAITLISTED
+}
+
+model Reviewer {
+  id             String            @id @default(cuid())
+  organizationId String
+  userId         String
+  status         String            @default("ACTIVE")
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  profile        ReviewerProfile?
+  assignments    ReviewAssignment[]
+  createdAt      DateTime          @default(now())
+
+  @@unique([organizationId, userId])
+  @@map("reviewers")
+}
+
+model ReviewerProfile {
+  id          String   @id @default(cuid())
+  reviewerId  String   @unique
+  institution String?
+  designation String?
+  bio         String?
+  expertise   String[]
+  keywords    String[]
+  reviewer    Reviewer @relation(fields: [reviewerId], references: [id])
+
+  @@map("reviewer_profiles")
+}
+
+model ReviewAssignment {
+  id                 String                 @id @default(cuid())
+  conferenceId       String
+  abstractId         String
+  reviewerId         String
+  assignedAt         DateTime               @default(now())
+  dueDate            DateTime?
+  status             ReviewAssignmentStatus @default(PENDING)
+  conflictOfInterest Boolean                @default(false)
+  reassignedFromId   String?
+  abstract           Abstract               @relation(fields: [abstractId], references: [id])
+  reviewer           Reviewer               @relation(fields: [reviewerId], references: [id])
+  review             Review?
+
+  @@index([reviewerId, status])
+  @@index([abstractId])
+  @@map("review_assignments")
+}
+
+model Review {
+  id                 String               @id @default(cuid())
+  assignmentId       String               @unique
+  overallScore       Int
+  originalityScore   Int
+  methodologyScore   Int
+  significanceScore  Int
+  presentationScore  Int
+  commentsToAuthor   String?
+  privateComments    String?
+  recommendation     ReviewRecommendation
+  submittedAt        DateTime             @default(now())
+  assignment         ReviewAssignment     @relation(fields: [assignmentId], references: [id])
+
+  @@map("reviews")
+}
+
+model AbstractDecision {
+  id                String               @id @default(cuid())
+  abstractId        String
+  decision          AbstractDecisionType
+  reason            String?
+  decidedBy         String
+  effectiveVersionId String?
+  decidedAt         DateTime             @default(now())
+  abstract          Abstract             @relation(fields: [abstractId], references: [id])
+
+  @@index([abstractId])
+  @@map("abstract_decisions")
+}
+
+model AbstractRevisionRequest {
+  id          String    @id @default(cuid())
+  abstractId  String
+  requestedBy String
+  reason      String
+  dueDate     DateTime?
+  resolvedAt  DateTime?
+  abstract    Abstract  @relation(fields: [abstractId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([abstractId])
+  @@map("abstract_revision_requests")
 }
