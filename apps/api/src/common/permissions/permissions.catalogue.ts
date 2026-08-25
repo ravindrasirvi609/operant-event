@@ -5,6 +5,8 @@ export const PERMISSIONS = {
   CONFERENCE_CREATE: 'conference.create',
   CONFERENCE_READ: 'conference.read',
   CONFERENCE_UPDATE: 'conference.update',
+  ABSTRACT_READ: 'abstract.read',
+  ABSTRACT_OVERRIDE_DEADLINE: 'abstract.override_deadline',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -17,6 +19,8 @@ export const PERMISSION_CATALOGUE: Array<{ module: string; action: string }> = [
   { module: 'conference', action: 'create' },
   { module: 'conference', action: 'read' },
   { module: 'conference', action: 'update' },
+  { module: 'abstract', action: 'read' },
+  { module: 'abstract', action: 'override_deadline' },
 ];
 
 export interface SystemRoleDefinition {
@@ -38,6 +42,8 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_CREATE,
       PERMISSIONS.CONFERENCE_READ,
       PERMISSIONS.CONFERENCE_UPDATE,
+      PERMISSIONS.ABSTRACT_READ,
+      PERMISSIONS.ABSTRACT_OVERRIDE_DEADLINE,
     ],
   },
   {
@@ -50,12 +56,18 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_CREATE,
       PERMISSIONS.CONFERENCE_READ,
       PERMISSIONS.CONFERENCE_UPDATE,
+      PERMISSIONS.ABSTRACT_READ,
+      PERMISSIONS.ABSTRACT_OVERRIDE_DEADLINE,
     ],
   },
   {
     name: 'Conference Admin',
     description:
       'Setup and management for conferences the member is assigned to.',
-    permissions: [PERMISSIONS.CONFERENCE_READ, PERMISSIONS.CONFERENCE_UPDATE],
+    permissions: [
+      PERMISSIONS.CONFERENCE_READ,
+      PERMISSIONS.CONFERENCE_UPDATE,
+      PERMISSIONS.ABSTRACT_READ,
+    ],
   },
 ];

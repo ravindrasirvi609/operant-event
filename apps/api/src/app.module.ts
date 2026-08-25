@@ -10,6 +10,8 @@ import { ConferencesModule } from './conferences/conferences.module';
 import { ConferenceSettingsModule } from './conference-settings/conference-settings.module';
 import { TracksModule } from './tracks/tracks.module';
 import { FilesModule } from './files/files.module';
+import { ConferenceFormFieldsModule } from './conference-form-fields/conference-form-fields.module';
+import { AbstractsModule } from './abstracts/abstracts.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { FilesModule } from './files/files.module';
     ConferenceSettingsModule,
     TracksModule,
     FilesModule,
+    ConferenceFormFieldsModule,
+    AbstractsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

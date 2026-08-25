@@ -210,6 +210,8 @@ model Conference {
   organization   Organization      @relation(fields: [organizationId], references: [id])
   settings       ConferenceSetting?
   tracks         ConferenceTrack[]
+  formFields     ConferenceFormField[]
+  abstracts      Abstract[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -248,6 +250,7 @@ model ConferenceTrack {
   sortOrder    Int        @default(0)
   status       String     @default("ACTIVE")
   conference   Conference @relation(fields: [conferenceId], references: [id])
+  abstracts    Abstract[]
 
   @@index([conferenceId])
   @@map("conference_tracks")
@@ -287,4 +290,129 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([conferenceId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Abstract Submission, Authors, Dynamic Form
+// Spec: docs/plans/02-abstract-submission.md
+// ---------------------------------------------------------------------------
+
+enum FormFieldType {
+  TEXT
+  LONG_TEXT
+  RICH_TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  RADIO
+  CHECKBOX
+  FILE
+  URL
+}
+
+enum AbstractStatus {
+  DRAFT
+  SUBMITTED
+  SCREENING
+  UNDER_REVIEW
+  REVISION_REQUIRED
+  RESUBMITTED
+  ACCEPTED
+  REJECTED
+  WAITLISTED
+  SCHEDULED
+  PRESENTED
+  WITHDRAWN
+}
+
+model ConferenceFormField {
+  id             String        @id @default(cuid())
+  conferenceId   String
+  section        String
+  fieldKey       String
+  label          String
+  fieldType      FormFieldType
+  isRequired     Boolean       @default(false)
+  optionsJson    Json?
+  validationJson Json?
+  sortOrder      Int           @default(0)
+  status         String        @default("ACTIVE") // ACTIVE | DISABLED — never deleted, see ABS-002
+  conference     Conference    @relation(fields: [conferenceId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([conferenceId, fieldKey])
+  @@index([conferenceId, status])
+  @@map("conference_form_fields")
+}
+
+model Abstract {
+  id                     String           @id @default(cuid())
+  conferenceId           String
+  trackId                String?
+  submissionNumber       String?
+  title                  String
+  submissionType         String // ORAL | POSTER | E_POSTER | WORKSHOP | SYMPOSIUM
+  presentationPreference String?
+  status                 AbstractStatus   @default(DRAFT)
+  submittedBy            String
+  currentVersionId       String?
+  submittedAt            DateTime?
+  conference             Conference       @relation(fields: [conferenceId], references: [id])
+  track                  ConferenceTrack? @relation(fields: [trackId], references: [id])
+  versions               AbstractVersion[]
+  authors                AbstractAuthor[]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  @@unique([conferenceId, submissionNumber])
+  @@index([conferenceId, status])
+  @@index([conferenceId, trackId])
+  @@map("abstracts")
+}
+
+model AbstractVersion {
+  id            String   @id @default(cuid())
+  abstractId    String
+  versionNumber Int
+  formData      Json
+  submittedAt   DateTime @default(now())
+  submittedBy   String
+  abstract      Abstract @relation(fields: [abstractId], references: [id])
+
+  @@unique([abstractId, versionNumber])
+  @@map("abstract_versions")
+}
+
+model Author {
+  id          String           @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?
+  mobile      String?
+  designation String?
+  institution String?
+  department  String?
+  city        String?
+  country     String?
+  abstracts   AbstractAuthor[]
+  createdAt   DateTime         @default(now())
+
+  @@map("authors")
+}
+
+model AbstractAuthor {
+  id              String   @id @default(cuid())
+  abstractId      String
+  authorId        String
+  authorOrder     Int
+  isCorresponding Boolean  @default(false)
+  isPresenting    Boolean  @default(false)
+  abstract        Abstract @relation(fields: [abstractId], references: [id])
+  author          Author   @relation(fields: [authorId], references: [id])
+
+  @@unique([abstractId, authorId])
+  @@index([abstractId])
+  @@map("abstract_authors")
 }
