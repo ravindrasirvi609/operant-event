@@ -101,6 +101,9 @@ tmp/
 temp/
 .cache/
 
+# Local-disk storage provider dev stopgap (apps/api/src/files)
+uploads/
+
 # ==========================================
 # Docker
 # ==========================================

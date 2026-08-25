@@ -4,9 +4,25 @@ import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { EnvModule } from './common/env/env.module';
 import { AuthModule } from './auth/auth.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { RolesModule } from './roles/roles.module';
+import { ConferencesModule } from './conferences/conferences.module';
+import { ConferenceSettingsModule } from './conference-settings/conference-settings.module';
+import { TracksModule } from './tracks/tracks.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
-  imports: [EnvModule, PrismaModule, AuthModule],
+  imports: [
+    EnvModule,
+    PrismaModule,
+    AuthModule,
+    OrganizationsModule,
+    RolesModule,
+    ConferencesModule,
+    ConferenceSettingsModule,
+    TracksModule,
+    FilesModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

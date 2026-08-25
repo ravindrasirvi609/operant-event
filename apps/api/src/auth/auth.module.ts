@@ -19,6 +19,6 @@ import { ConsoleAuthMailer } from './console-auth-mailer';
     JwtStrategy,
     { provide: AUTH_MAILER, useClass: ConsoleAuthMailer },
   ],
-  exports: [AuthService],
+  exports: [AuthService, PasswordService, TokenService, AUTH_MAILER],
 })
 export class AuthModule {}
