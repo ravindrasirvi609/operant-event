@@ -258,6 +258,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.4.2
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)
