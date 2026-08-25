@@ -4,6 +4,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   PORT: z.coerce.number().int().positive().default(3000),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
 });
 
 export type Env = z.infer<typeof envSchema>;

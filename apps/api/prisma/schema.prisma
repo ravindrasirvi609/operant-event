@@ -1,13 +1,290 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — Auth, Organization, RBAC, Conference
+// Spec: docs/plans/01-auth-organization-rbac-conference.md
+// ---------------------------------------------------------------------------
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DEACTIVATED
+}
+
+enum ConferenceStatus {
+  DRAFT
+  OPEN
+  REVIEW
+  REGISTRATION
+  ONGOING
+  COMPLETED
+  ARCHIVED
+}
+
+enum ReviewMode {
+  SINGLE_BLIND
+  DOUBLE_BLIND
+  OPEN
+}
+
+model Organization {
+  id           String                   @id @default(cuid())
+  name         String
+  slug         String                   @unique
+  status       OrganizationStatus       @default(ACTIVE)
+  contactEmail String?
+  contactPhone String?
+  website      String?
+  logoFileId   String?
+  memberships  OrganizationMembership[]
+  roles        Role[]
+  conferences  Conference[]
+  files        File[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@map("organizations")
+}
+
+model User {
+  id                 String                   @id @default(cuid())
+  email              String                   @unique
+  passwordHash       String
+  firstName          String
+  lastName            String
+  status             UserStatus               @default(INVITED)
+  emailVerifiedAt    DateTime?
+  lastLoginAt        DateTime?
+  memberships        OrganizationMembership[]
+  sessions           Session[]
+  passwordResets     PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@map("users")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  status         MembershipStatus @default(INVITED)
+  invitedAt      DateTime         @default(now())
+  joinedAt       DateTime?
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+  roles          MembershipRole[]
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
+model Role {
+  id             String           @id @default(cuid())
+  organizationId String?
+  name           String
+  description    String?
+  isSystem       Boolean          @default(false)
+  organization   Organization?    @relation(fields: [organizationId], references: [id])
+  permissions    RolePermission[]
+  memberships    MembershipRole[]
+
+  @@unique([organizationId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id     String           @id @default(cuid())
+  module String
+  action String
+  roles  RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model MembershipRole {
+  membershipId String
+  roleId       String
+  membership   OrganizationMembership @relation(fields: [membershipId], references: [id])
+  role         Role                   @relation(fields: [roleId], references: [id])
+
+  @@id([membershipId, roleId])
+  @@map("membership_roles")
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  user             User      @relation(fields: [userId], references: [id])
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+
+  @@map("email_verification_tokens")
+}
+
+model Conference {
+  id             String            @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  shortName      String?
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  timezone       String
+  venueName      String?
+  venueAddress   String?
+  city           String?
+  country        String?
+  website        String?
+  contactEmail   String?
+  logoFileId     String?
+  bannerFileId   String?
+  status         ConferenceStatus  @default(DRAFT)
+  createdBy      String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  settings       ConferenceSetting?
+  tracks         ConferenceTrack[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+  @@map("conferences")
+}
+
+model ConferenceSetting {
+  id                    String     @id @default(cuid())
+  conferenceId          String     @unique
+  abstractEnabled       Boolean    @default(false)
+  abstractStartDate     DateTime?
+  abstractEndDate       DateTime?
+  reviewEnabled         Boolean    @default(false)
+  reviewMode            ReviewMode @default(SINGLE_BLIND)
+  registrationEnabled   Boolean    @default(false)
+  registrationStartDate DateTime?
+  registrationEndDate   DateTime?
+  paymentEnabled        Boolean    @default(false)
+  certificateEnabled    Boolean    @default(false)
+  checkinEnabled        Boolean    @default(false)
+  conference            Conference @relation(fields: [conferenceId], references: [id])
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@map("conference_settings")
+}
+
+model ConferenceTrack {
+  id           String     @id @default(cuid())
+  conferenceId String
+  name         String
+  code         String?
+  description  String?
+  sortOrder    Int        @default(0)
+  status       String     @default("ACTIVE")
+  conference   Conference @relation(fields: [conferenceId], references: [id])
+
+  @@index([conferenceId])
+  @@map("conference_tracks")
+}
+
+model File {
+  id             String       @id @default(cuid())
+  organizationId String
+  fileName       String
+  storageKey     String
+  mimeType       String
+  size           Int
+  bucket         String
+  uploadedBy     String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@map("files")
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  conferenceId   String?
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  userAgent      String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([conferenceId, createdAt])
+  @@map("audit_logs")
 }
