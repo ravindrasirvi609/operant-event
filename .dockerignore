@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/generated
+.git
+.github
+
+# Secrets: never let a local .env end up in a build context/image layer
+.env
+**/.env
+**/.env.*
+!**/.env.example
+
+docs
+*.md
