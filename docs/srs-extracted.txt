@@ -1,0 +1,1377 @@
+
+OPERANT EVENT
+Software Requirements Specification
+Conference, Abstract, Registration & Event Operations SaaS Platform
+Document Property
+Value
+Document Version
+1.0
+Status
+Baseline / Development SRS
+Product
+Operant Event
+Repository
+github.com/ravindrasirvi609/operant-event
+Architecture
+Multi-tenant SaaS / Modular Monolith
+Primary Stack
+Next.js + NestJS + PostgreSQL + Prisma + Redis
+Prepared
+August 2026
+Purpose: Provide the single functional and technical baseline for product, design, engineering, QA, operations and future integrations.
+
+Document Control
+Version
+Date
+Status
+Author
+Description
+1.0
+2026-08-25
+Baseline
+Operant Event Product Team
+Initial comprehensive SRS for the multi-tenant conference and event management SaaS.
+1.1
+TBD
+Planned
+TBD
+Post-MVP change set and approved clarifications.
+Approval & Ownership
+Area
+Owner
+Approval Required
+Product scope
+Product Owner
+Yes
+Architecture
+Engineering Lead
+Yes
+Security & privacy
+Security/Engineering
+Yes
+Finance & payments
+Finance/Product
+Yes
+Release readiness
+QA + Product
+Yes
+Table of Contents
+1. Executive Summary
+2. Product Vision and Goals
+3. Scope
+4. Stakeholders and Personas
+5. Product Principles
+6. System Context and Architecture
+7. Tenant and Organization Model
+8. Roles and Permissions
+9. Functional Requirements
+10. Abstract Management
+11. Peer Review Management
+12. Decision and Revision Management
+13. Registration Management
+14. Payment, Orders and Invoicing
+15. Conference Program and Scheduling
+16. Speakers, Chairs and Presenters
+17. Attendance, Check-in and Badge Management
+18. Certificates and Verification
+19. Sponsors and Exhibitors
+20. Communications and Notifications
+21. Files and Document Management
+22. Reporting and Analytics
+23. Administration and Configuration
+24. Audit Logging
+25. Search and Data Access
+26. API and Integration Requirements
+27. Data Model and Entity Requirements
+28. Security Requirements
+29. Privacy and Compliance Requirements
+30. Non-Functional Requirements
+31. Error Handling and Resilience
+32. Observability and Supportability
+33. DevOps, Environments and Deployment
+34. QA and Testing Strategy
+35. UX/UI Requirements
+36. Accessibility
+37. Mobile and Responsive Requirements
+38. Data Migration and Import/Export
+39. Release Phases and MVP
+40. Future Enhancements
+41. Acceptance and Definition of Done
+42. Assumptions, Risks and Open Decisions
+
+1. Executive Summary
+Operant Event is a multi-tenant SaaS platform for conference organizers, professional associations, academic institutions, medical societies, event agencies and similar organizations. The platform will manage the end-to-end lifecycle of an event, from conference setup and abstract submission through peer review, acceptance, registration, payment, scheduling, on-site attendance, certificates and post-event reporting.
+The system is designed as a configurable platform rather than a single-purpose conference website. Each organization can operate multiple conferences, and each conference can independently configure submission forms, tracks, review rules, registration categories, pricing, sessions, speakers, notification templates and certificate policies. The architecture must enforce strict tenant isolation so one organization or conference cannot access another customer's data.
+The baseline implementation uses a modular-monolith backend with NestJS, a Next.js web frontend, PostgreSQL with Prisma as the primary data store, Redis for caching and queues, BullMQ for background work, object storage for files, and provider adapters for payments and communications.
+Centralize conference administration into one SaaS workspace.
+Replace spreadsheets and disconnected tools for abstract and reviewer management.
+Provide configurable workflows without requiring engineering changes for every event.
+Protect author, reviewer, payment and organizational data through tenant-aware authorization.
+Provide a clean operational workflow for on-site event teams.
+Create a technical foundation that can scale from small workshops to large multi-track conferences.
+2. Product Vision and Goals
+2.1 Vision
+Build a reusable conference operating system where an organizer can configure, launch, operate and close a conference from one product while participants, authors, reviewers, speakers and staff each receive focused experiences.
+2.2 Business Goals
+1. Enable organizations to create and operate multiple conferences under one account.
+2. Reduce administrative effort for abstract, review, registration and check-in workflows.
+3. Create a SaaS product capable of plan-based pricing and usage-based billing.
+4. Allow configuration of event-specific workflows without code changes.
+5. Create reusable platform capabilities for future event types such as workshops, seminars, congresses and exhibitions.
+2.3 Success Metrics
+Metric
+Definition
+Initial Target
+Conference setup time
+Time from tenant creation to publish-ready event
+< 60 minutes for a standard event
+Abstract processing
+Manual touch points per submitted abstract
+Reduce by at least 50% vs spreadsheet workflow
+Review completion
+Reviews completed before due date
+> 90%
+Registration confirmation
+Paid registration automatically confirmed after provider webhook
+> 99%
+Check-in throughput
+Successful attendee scans per staff station
+Operationally optimized for event day
+System availability
+Monthly availability for production SaaS
+>= 99.9% target
+3. Scope
+3.1 In Scope
+Multi-tenant organizations and conferences.
+User accounts, authentication and RBAC.
+Conference configuration and important dates.
+Configurable abstract submission and author management.
+Reviewer profiles, assignment, blind review and conflict-of-interest handling.
+Decisions, revision cycles and acceptance communication.
+Registration categories, pricing windows, add-ons and capacity controls.
+Orders, payments, invoices, refunds and provider reconciliation hooks.
+Program, sessions, presentation assignments, speakers and chairs.
+QR-based check-in, attendance and badge workflows.
+Certificate eligibility, generation and public verification.
+Sponsor and exhibitor management.
+Email/in-app notifications and reusable templates.
+File storage, exports, reports, analytics and audit logs.
+3.2 Out of Scope for Initial MVP
+Native iOS/Android apps.
+Full CRM functionality unrelated to events.
+Airline or hotel booking engines.
+Accounting ledger replacement.
+Complex procurement and inventory management.
+AI-driven final scientific acceptance decisions.
+Custom hardware beyond standard QR/barcode scanning and printer integrations.
+4. Stakeholders and Personas
+Persona
+Primary Need
+Key Capabilities
+Platform Super Admin
+Operate SaaS
+Tenants, plans, support, system configuration, audit and platform analytics
+Organization Owner
+Own customer workspace
+Organization settings, users, billing and all conferences
+Conference Manager
+Run a conference
+Setup, abstracts, reviewers, registration, program and event operations
+Track Chair
+Manage a scientific/content track
+Review assignments, decisions and scheduling for assigned track
+Reviewer
+Evaluate submissions
+Assigned abstracts, scores, recommendations, conflicts, deadlines
+Author
+Submit scientific content
+Abstract submission, co-authors, revision and acceptance status
+Attendee
+Register and attend
+Registration, payment, QR, schedule and certificates
+Speaker/Chair
+Participate in program
+Sessions, presentation details, profile and certificate
+Finance Manager
+Control money flow
+Pricing, payments, invoices, refunds and reports
+Registration Staff
+Operate event day
+Search, scan, check-in, badge and attendance
+Sponsor/Exhibitor
+Manage commercial participation
+Package, payment, booth and staff information
+5. Product Principles
+Configuration over customization: event teams should configure forms and rules without code.
+Tenant isolation by default: every data access path must establish organizational context.
+Immutable history for critical workflows: submissions, reviews, decisions, payments and audit entries must retain meaningful history.
+API-first business logic: important actions must be represented by service-layer operations and auditable APIs.
+Asynchronous by design for heavy work: emails, PDFs, exports and large imports must use background jobs.
+Provider abstraction: payment, email, file storage and identity integrations should not be hard-wired into domain logic.
+Operational simplicity: the event-day workflows must work even under time pressure.
+6. System Context and Architecture
+The recommended architecture is a modular monolith with clear bounded modules. Microservices are intentionally deferred until scale or organizational boundaries justify service separation. This keeps the first production system easier to build, test and operate while preserving domain boundaries for later extraction.
+Internet
+  |
+  +--> Cloudflare / WAF / CDN
+         |
+         +--> Next.js Web Application
+         |       +--> Public Conference Sites
+         |       +--> Organizer Portal
+         |       +--> Participant Portal
+         |
+         +--> NestJS API
+                 |
+                 +--> Auth / RBAC / Tenant Context
+                 +--> Conference / Abstract / Review Domains
+                 +--> Registration / Payment Domains
+                 +--> Program / Attendance / Certificate Domains
+                 +--> Notifications / Files / Reports / Audit
+                 |
+                 +--> PostgreSQL (Prisma)
+                 +--> Redis
+                 +--> Object Storage (S3/R2)
+                 +--> External Providers
+                 |      +--> Razorpay / Stripe
+                 |      +--> Email Provider
+                 |      +--> Optional SMS / WhatsApp
+                 |
+                 +--> BullMQ
+                         |
+                         +--> Worker Processes
+6.1 Application Components
+Component
+Technology
+Responsibility
+Web
+Next.js + TypeScript
+Public pages, organizer UI, participant UI, responsive experience
+API
+NestJS + TypeScript
+Authentication, authorization, domain logic, REST APIs, webhooks
+Worker
+Node.js/Nest-compatible worker + BullMQ
+Email, PDFs, certificates, imports, exports, scheduled jobs
+Database
+PostgreSQL + Prisma
+Transactional system of record
+Cache/Queue
+Redis
+Caching, rate limits, ephemeral state and job queues
+Object storage
+S3 or Cloudflare R2
+Uploaded documents, images, generated PDFs
+Monitoring
+Sentry + structured logs
+Errors, traces, support diagnostics
+6.2 Recommended Repository Layout
+operant-event/
+  apps/
+    web/       # Next.js frontend
+    api/       # NestJS backend
+    worker/    # Background jobs
+  packages/
+    ui/
+    types/
+    validation/
+    config/
+  infrastructure/
+    docker/
+  docs/
+  package.json
+  pnpm-workspace.yaml
+  turbo.json
+7. Tenant and Organization Model
+The SaaS tenancy boundary is the organization. An organization can own multiple conferences. A conference may contain many users, abstracts, registrations, payments, sessions and other event-specific records.
+Platform
+  Organization
+    - Users
+    - Roles / Permissions
+    - Conferences
+      - Tracks
+      - Abstracts
+      - Reviewers / Reviews
+      - Registrations / Payments
+      - Sessions / Speakers
+      - Attendance / Certificates
+7.1 Tenant Isolation Requirements
+Every tenant-owned table must contain organization_id directly or be reachable through a tenant-owned parent.
+Every request must resolve current organization context from a verified membership/session, not from an arbitrary client-supplied tenant ID.
+Conference-scoped APIs must verify that the conference belongs to the current organization before querying child records.
+Background jobs must carry organization_id and conference_id where relevant.
+Exports must only include records authorized for the requesting organization.
+Administrative support access must be explicit, auditable and time-bounded where practical.
+8. Roles and Permissions
+RBAC must be permission-based rather than hard-coded around role names. A role is a named grouping of permissions. Organization administrators can create custom roles within the allowed permission catalogue.
+Role
+Typical Permissions
+Platform Super Admin
+All platform operations; tenant support; plans; feature flags; system configuration
+Organization Owner
+All organization and conference operations; organization billing
+Organization Admin
+Most organization and conference operations excluding ownership transfer
+Conference Admin
+One or more conferences; setup, submissions, review, registration and program
+Track Chair
+Assigned tracks; reviewer assignment, review oversight and decisions where granted
+Reviewer
+Only assigned reviews; no access to hidden author information where blind review applies
+Finance Manager
+Pricing, orders, payments, invoices, refunds and exports
+Registration Staff
+Registration lookup, check-in, attendance and badge operations
+Speaker
+Own speaker profile, sessions and presentation details
+Participant/Author
+Own submissions, registration, payments, profile and certificates
+9. Functional Requirements
+The following requirements define the baseline behavior. Priority levels are P0 (critical for MVP), P1 (important), and P2 (later/advanced).
+9.1 Authentication and Account Management
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+AUTH-001
+Registration
+A user can create an account using approved identity fields and a verified email.
+P0
+Account created; verification required before protected operations.
+AUTH-002
+Login
+A user can log in securely and receive a managed application session.
+P0
+Valid credentials create a session; invalid credentials do not reveal which field failed.
+AUTH-003
+Password reset
+A user can request a password reset through an expiring one-time link or token.
+P0
+Reset token expires and cannot be reused.
+AUTH-004
+Email verification
+The system verifies account email addresses.
+P0
+Unverified accounts are restricted according to policy.
+AUTH-005
+Session revocation
+Users and authorized admins can invalidate active sessions.
+P1
+Revoked sessions cannot access protected APIs.
+AUTH-006
+MFA readiness
+The architecture supports optional TOTP or provider-based MFA.
+P2
+MFA can be enabled without redesigning authorization.
+9.2 Organization Management
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+ORG-001
+Create organization
+An eligible user can create an organization and become its owner.
+P0
+Organization has unique ID, slug and owner membership.
+ORG-002
+Organization profile
+Admins can manage organization name, logo, contact details and website.
+P0
+Changes are persisted and audited.
+ORG-003
+Members
+Admins can invite, deactivate and manage organization members.
+P0
+Invitations are scoped to the organization.
+ORG-004
+Roles
+Admins can assign roles and permissions subject to policy.
+P0
+Effective permissions are enforced at API level.
+ORG-005
+Tenant isolation
+Members cannot access another organization's data.
+P0
+Cross-tenant access returns authorization failure and is logged when applicable.
+ORG-006
+Auditability
+Sensitive organization actions produce audit logs.
+P1
+Actor, action, entity and timestamp are recorded.
+9.3 Conference Management
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+CONF-001
+Create conference
+Authorized staff can create a conference with basic identity and dates.
+P0
+Conference is created in DRAFT state.
+CONF-002
+Conference settings
+Authorized users can configure submission, review, registration, certificate and check-in settings.
+P0
+Settings are validated and scoped to conference.
+CONF-003
+Tracks
+Admins can create, update, reorder and archive conference tracks.
+P0
+Track changes are reflected in allowed submission and review contexts.
+CONF-004
+Important dates
+Admins can define abstract, review, registration and event dates.
+P0
+System validates date dependencies and exposes dates to UI.
+CONF-005
+Publish controls
+A conference can be published only after required settings are complete.
+P0
+Incomplete configurations are blocked with actionable validation.
+CONF-006
+Status lifecycle
+Conference status follows defined lifecycle transitions.
+P0
+Invalid transitions are rejected.
+10. Abstract Management
+Abstract management is a core domain. The system must support configurable forms, multiple authors, version history, file attachments, submission numbering, status transitions, screening and later review/decision workflows.
+10.1 Abstract Lifecycle
+DRAFT -> SUBMITTED -> SCREENING -> UNDER_REVIEW ->
+REVISION_REQUIRED -> RESUBMITTED -> ACCEPTED / REJECTED / WAITLISTED
+                                   |
+                                   +-> SCHEDULED -> PRESENTED
+10.2 Submission Form Requirements
+Conference administrators can define form sections and fields.
+Field types include text, long text, rich text, number, date, select, multi-select, radio, checkbox, file and URL.
+Fields can be required/optional and can have validation rules.
+Field order is configurable.
+Fields can be enabled or disabled without deleting historical submitted values.
+Submitted form data is versioned with the abstract version.
+Large content and files must be stored using appropriate limits and object storage.
+10.3 Submission Numbering
+The system should generate a human-friendly submission number per conference, such as A-000123. The internal primary key remains a non-sequential UUID/CUID-style identifier. Submission number uniqueness is guaranteed within the conference.
+10.4 Abstract Requirements
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+ABS-001
+Create draft
+Authorized authors can create a draft abstract.
+P0
+Draft can be saved without completing required final fields.
+ABS-002
+Dynamic form
+Submission form is generated from conference configuration.
+P0
+All configured active fields render with validation.
+ABS-003
+Authors
+Author can add, edit and order co-authors.
+P0
+Primary/corresponding/presenting author rules are validated.
+ABS-004
+Save version
+Every submitted revision creates an immutable version.
+P0
+Previous versions remain queryable.
+ABS-005
+Submit
+Author can submit a completed abstract before deadline.
+P0
+Status becomes SUBMITTED and timestamp is recorded.
+ABS-006
+Deadline enforcement
+Submission actions respect conference deadlines and explicit admin overrides.
+P0
+After deadline, normal submit is blocked.
+ABS-007
+Withdraw
+Eligible users can withdraw before final lock.
+P1
+Withdrawal is recorded and audited.
+ABS-008
+Attachments
+Authors can upload approved supporting files.
+P1
+File type/size restrictions are enforced.
+ABS-009
+Author privacy
+Blind-review configurations hide author information from reviewers.
+P0
+Reviewer API/UI never exposes protected author fields.
+ABS-010
+Export
+Authorized staff can export abstract data.
+P1
+Exports respect tenant and role permissions.
+11. Peer Review Management
+Review management must support manual and semi-automated reviewer assignment, configurable scoring, blind review, reviewer conflicts, deadlines and completion monitoring.
+11.1 Reviewer Assignment
+Manual assignment by conference/track administrators.
+Automatic suggestions based on expertise keywords or track membership.
+Conflict-of-interest exclusion.
+Configurable number of reviewers per abstract.
+Due dates and reminders.
+Reassignment with audit history.
+11.2 Review Form
+Field
+Type
+Example
+Originality
+Score 1-5
+4
+Methodology
+Score 1-5
+5
+Significance
+Score 1-5
+4
+Presentation quality
+Score 1-5
+3
+Overall score
+Score 1-5
+4
+Recommendation
+Single select
+Accept
+Comments to author
+Long text
+Scientific feedback
+Private comments
+Long text
+Internal committee note
+11.3 Review Requirements
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+REV-001
+Reviewer profile
+Reviewer can maintain expertise and affiliation information.
+P0
+Profile available for assignment matching.
+REV-002
+Assignment
+Authorized staff can assign reviews.
+P0
+Assignment includes due date and status.
+REV-003
+Conflict
+Reviewer can declare conflict; system blocks conflicted assignments.
+P0
+Conflict is stored and enforced.
+REV-004
+Blind review
+System respects conference blind-review mode.
+P0
+Protected data never appears in reviewer context.
+REV-005
+Score form
+Reviewer completes configured evaluation form.
+P0
+Required questions must be completed.
+REV-006
+Submit review
+Reviewer can submit final review once.
+P0
+Submitted review is immutable unless authorized correction process exists.
+REV-007
+Reminders
+System sends reminders for due or overdue reviews.
+P1
+Jobs are queued and auditable.
+REV-008
+Completion dashboard
+Admins see assigned, completed and overdue counts.
+P1
+Counts are accurate by conference and track.
+12. Decision and Revision Management
+Final decisions must remain separate from individual reviewer recommendations. The authorized committee/track chair selects the final decision and can record a reason or internal note.
+Decision
+Meaning
+ACCEPTED
+Submission accepted for conference participation.
+REJECTED
+Submission not accepted.
+REVISION_REQUIRED
+Author must revise within allowed window.
+WAITLISTED
+Held for later capacity/program decision.
+12.1 Revision Requirements
+Revision must create a new abstract version, never overwrite historical content.
+System records the revision request reason and due date.
+Reviewer re-review may be required based on configuration.
+Final acceptance must reference the effective abstract version.
+Acceptance/rejection notices are generated from templates and queued asynchronously.
+13. Registration Management
+Registration must support configurable categories, pricing windows, capacities, add-ons, taxes/fees, coupons/discounts where enabled, cancellation/refund policy and participant data collection.
+13.1 Registration Categories
+Category
+Example
+Student
+Student delegate
+Faculty
+Faculty/academic
+Delegate
+General participant
+Speaker
+Invited or accepted presenter
+VIP
+Special attendee
+Exhibitor
+Exhibition staff
+13.2 Pricing Windows
+A registration category can have multiple price periods such as Early Bird, Regular and Late. The effective price is determined from conference dates and pricing rules. The system must preserve the price at order time so later price changes do not alter historical orders.
+13.3 Registration Requirements
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+REG-001
+Registration form
+Attendee completes required conference registration fields.
+P0
+Validation follows configured field definitions.
+REG-002
+Pricing
+System calculates current category price and enabled add-ons.
+P0
+Calculation is reproducible and recorded in order lines.
+REG-003
+Capacity
+Limited categories or workshops enforce capacity.
+P1
+Unavailable capacity prevents new qualifying orders.
+REG-004
+Confirmation
+Successful payment produces a confirmed registration.
+P0
+Confirmation includes registration number and next steps.
+REG-005
+Amendments
+Authorized users can amend participant details within policy.
+P1
+Changes are audited.
+REG-006
+Cancellation
+System applies configured cancellation policy.
+P1
+Status and refund workflow are auditable.
+14. Payment, Orders and Invoicing
+Payment processing must use provider webhooks as the authoritative confirmation signal. Client-side payment callbacks are not sufficient to mark a registration paid.
+Registration
+  -> Create Order
+  -> Create Provider Payment/Checkout
+  -> Customer Pays
+  -> Provider Webhook
+  -> Verify Signature
+  -> Record Payment
+  -> Mark Order Paid
+  -> Confirm Registration
+  -> Queue Invoice + Confirmation Email
+14.1 Requirements
+ID
+Requirement
+Description
+Priority
+Acceptance Criteria
+PAY-001
+Provider adapter
+System integrates through a payment-provider abstraction.
+P0
+Domain code is independent of provider-specific APIs.
+PAY-002
+Webhook verification
+Incoming webhooks are signature-verified and idempotently processed.
+P0
+Duplicate webhook does not duplicate payment state or order actions.
+PAY-003
+Order snapshot
+Order lines preserve price, tax, discount and quantity at purchase time.
+P0
+Historical total remains reproducible.
+PAY-004
+Payment status
+System tracks pending, success, failed, cancelled and refunded states.
+P0
+State transitions are validated.
+PAY-005
+Invoice
+Confirmed paid orders can generate an invoice.
+P1
+Invoice number is unique and retrievable.
+PAY-006
+Refund
+Authorized users can initiate/record refunds.
+P1
+Refund events are linked to original payment/order.
+15. Conference Program and Scheduling
+Program management converts accepted abstracts and invited content into an operational event schedule. The system should support multiple days, rooms, tracks and session types.
+Session creation and editing
+Room/venue labeling
+Start/end time validation
+Track association
+Chair and co-chair assignment
+Speaker assignment
+Presentation assignment
+Ordering within a session
+Conflict detection for overlapping speaker assignments
+Program publishing controls
+15.1 Schedule Constraints
+Session end must be after start.
+Presentation duration must fit within session boundaries.
+A presentation cannot be assigned to two sessions at once.
+Optional policy: a speaker cannot have overlapping sessions.
+Published schedules must expose a stable public representation/version.
+16. Speakers, Chairs and Presenters
+Speaker profile with name, designation, institution, country, bio and photo.
+Speaker can be linked to one or more sessions.
+An abstract can designate a presenting author.
+Program-facing speaker pages can be published publicly.
+Speaker/Chair certificate eligibility is separate from attendee certificate eligibility.
+17. Attendance, Check-in and Badge Management
+Event-day workflows must be optimized for speed and resilience. A staff member should be able to search or scan a registration and complete check-in with minimal interaction.
+QR Scan / Search
+   -> Resolve Registration
+   -> Validate registration status
+   -> Record check-in timestamp
+   -> Update attendance
+   -> Optional: Print badge
+Unique QR/short code per registration.
+Manual search fallback using registration number, email or phone.
+Check-in should be idempotent unless re-entry is explicitly enabled.
+Optional session-level attendance records.
+Badge template configuration with participant name, type, organization and QR.
+18. Certificates and Verification
+Certificates are generated according to configurable eligibility rules. Each certificate receives a unique certificate number and verification code. The verification endpoint must reveal only the minimum information required to validate authenticity.
+Certificate Type
+Typical Eligibility
+Participation
+Confirmed registration + attendance threshold
+Presentation
+Accepted abstract + presentation marked complete
+Speaker
+Speaker assigned to a published session
+Reviewer
+Configured review participation threshold
+Chair
+Assigned chair role
+Workshop
+Workshop registration + workshop attendance
+19. Sponsors and Exhibitors
+Sponsor package definitions with benefits and pricing.
+Sponsor organizations, contacts and payment status.
+Exhibitor booth allocation and booth number.
+Exhibitor staff registration.
+Document uploads such as logos and compliance forms.
+Public sponsor/exhibitor listing controls.
+20. Communications and Notifications
+Communication must be event-aware, template-driven and queued. Templates can contain variables such as participant name, conference name, abstract number, registration number, payment amount and key dates.
+Notification
+Trigger
+Channel
+Abstract submitted
+Submission successful
+Email + in-app
+Review assigned
+Reviewer assignment
+Email + in-app
+Review due
+Approaching due date
+Email
+Revision required
+Decision saved
+Email + in-app
+Abstract accepted
+Acceptance decision
+Email
+Payment successful
+Provider webhook
+Email + in-app
+Event reminder
+Scheduled date rule
+Email/in-app
+Certificate available
+Certificate generated
+Email + in-app
+21. Files and Document Management
+Binary files are stored in object storage, not PostgreSQL blobs.
+Database stores object key, metadata, size, MIME type, uploader and ownership context.
+Presigned URLs are preferred for direct browser uploads/downloads where secure.
+Virus/malware scanning can be added at the storage pipeline for enterprise deployments.
+Deleted files should follow retention policy and audit requirements.
+22. Reporting and Analytics
+Dashboard
+Core Metrics
+Conference Overview
+Abstracts, registrations, revenue, attendance, completion
+Abstracts
+Submitted by day, status, track, type, acceptance rate
+Review
+Assigned, completed, overdue, average scores, reviewer workload
+Registration
+Count by category, pricing period, geography, payment status
+Revenue
+Gross, discounts, tax, refunds, net operational view
+Attendance
+Registered vs checked in, session participation
+Certificates
+Eligible, generated, downloaded, verified
+Reports must be exportable in CSV/XLSX where appropriate. Large reports should be generated asynchronously and delivered through a secure download link.
+23. Administration and Configuration
+Conference lifecycle controls.
+Form builder and validation rules.
+Review criteria and scoring forms.
+Registration categories and pricing windows.
+Email templates and branding.
+Certificate templates and eligibility rules.
+Roles and permissions.
+Feature flags and plan entitlements.
+Time zone and localization settings.
+24. Audit Logging
+Audit logs are required for security, troubleshooting and regulated workflows. At minimum, the system should capture create/update/delete, permission changes, decisions, payment state changes, refunds, exports, impersonation/support actions and key configuration changes.
+Field
+Purpose
+organization_id
+Tenant boundary
+conference_id
+Event context
+actor_user_id
+Who performed action
+action
+CREATE/UPDATE/DELETE/LOGIN/etc.
+entity_type
+Target type
+entity_id
+Target identifier
+old_values
+Before snapshot where appropriate
+new_values
+After snapshot where appropriate
+ip_address
+Security context
+user_agent
+Client context
+created_at
+Event timestamp
+25. Search and Data Access
+The initial release should use PostgreSQL indexes and full-text/case-insensitive search where practical. External search engines such as OpenSearch can be introduced later for high-volume cross-field search.
+Search must always be tenant-scoped.
+Search results must respect role permissions and blind-review visibility.
+Exact identifiers such as submission number and registration number should be indexed.
+Pagination should use stable ordering and limit result size.
+Large datasets must avoid unbounded API responses.
+26. API and Integration Requirements
+The API should be versioned from the beginning. Recommended path prefix: /api/v1. REST is the initial API style. OpenAPI/Swagger documentation is required for internal and integration consumers.
+Domain
+Example Endpoints
+Auth
+POST /api/v1/auth/login ; POST /api/v1/auth/refresh ; POST /api/v1/auth/logout
+Organizations
+GET /api/v1/organizations/me ; POST /api/v1/organizations
+Conferences
+GET /api/v1/conferences ; POST /api/v1/conferences ; GET /api/v1/conferences/:id
+Abstracts
+POST /api/v1/conferences/:id/abstracts ; GET /api/v1/abstracts/:id ; POST /api/v1/abstracts/:id/submit
+Reviews
+GET /api/v1/reviews/my ; POST /api/v1/review-assignments/:id/review
+Registrations
+POST /api/v1/conferences/:id/registrations ; GET /api/v1/registrations/:id
+Payments
+POST /api/v1/orders ; POST /api/v1/payments/webhooks/:provider
+Program
+GET /api/v1/conferences/:id/program ; POST /api/v1/sessions
+Check-in
+POST /api/v1/checkins ; GET /api/v1/conferences/:id/checkins
+Certificates
+GET /api/v1/certificates/:id ; GET /api/v1/certificates/verify/:code
+26.1 API Standards
+Consistent JSON envelope/error format.
+HTTP status codes used correctly.
+Request validation at controller boundary using DTO/class-validator or equivalent.
+Idempotency keys for payment-sensitive or retry-prone write endpoints.
+Pagination for collection endpoints.
+Correlation/request ID for troubleshooting.
+OpenAPI documentation generated from code.
+No direct exposure of secrets or provider credentials.
+27. Data Model and Entity Requirements
+The initial database is relational and transaction-oriented. UUID/CUID-style non-meaningful primary keys are recommended. Human-friendly identifiers such as submission_number, registration_number, invoice_number and certificate_number are separate unique business identifiers.
+Entity
+Key Relationships
+Core Purpose
+organizations
+1:N users, conferences
+Tenant boundary
+users
+N:M roles; 1:N authored/managed records
+Identity
+roles/permissions
+N:M
+RBAC
+conferences
+N:1 organization
+Event container
+tracks
+N:1 conference
+Classification
+abstracts
+N:1 conference; N:M authors
+Submission record
+abstract_versions
+N:1 abstract
+History
+review_assignments
+N:1 abstract; N:1 reviewer
+Review routing
+reviews
+N:1 assignment
+Evaluation
+decisions
+N:1 abstract
+Final outcome
+registrations
+N:1 conference
+Participant registration
+orders
+N:1 registration
+Commercial order
+payments
+N:1 order
+Provider transaction
+sessions
+N:1 conference
+Program block
+presentation_assignments
+N:1 session; N:1 abstract
+Presentation schedule
+attendance/checkins
+N:1 registration; optional session
+Event participation
+certificates
+N:1 registration
+Credential issuance
+audit_logs
+tenant + optional conference
+Security/history
+27.1 Recommended Initial Prisma Models
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  status    OrganizationStatus @default(ACTIVE)
+  users     User[]
+  conferences Conference[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conference {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  status         ConferenceStatus @default(DRAFT)
+  startDate      DateTime
+  endDate        DateTime
+  timezone       String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  settings       ConferenceSetting?
+  tracks         ConferenceTrack[]
+  abstracts      Abstract[]
+  registrations Registration[]
+  sessions       Session[]
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+}
+27.2 Core Database Tables
+Table
+Required Core Fields
+organizations
+id, name, slug, status, contact fields, timestamps
+users
+id, email, name, password/session fields, status, timestamps
+roles
+id, organization_id, name, description
+permissions
+id, module, action
+role_permissions
+role_id, permission_id
+user_roles
+user_id, role_id
+conferences
+id, organization_id, name, slug, dates, timezone, status
+conference_settings
+conference_id, workflow dates, feature flags
+conference_tracks
+id, conference_id, name, code, status, sort order
+abstracts
+id, conference_id, track_id, submission_number, status, current_version_id
+abstract_versions
+id, abstract_id, version_number, form_data/content, submitted_at
+authors
+id, profile fields, organization-independent identity data
+abstract_authors
+abstract_id, author_id, order and relationship flags
+reviewers
+id, organization_id, user_id, status
+reviewer_profiles
+reviewer_id, expertise and affiliation
+review_assignments
+id, abstract_id, reviewer_id, due date, status, conflict
+reviews
+assignment_id, scores, recommendation, comments
+abstract_decisions
+abstract_id, decision, reason, actor, timestamp
+registrations
+id, conference_id, registration number, user, category, status
+registration_types
+category, price, dates, capacity
+orders
+registration/order totals and status
+order_items
+line items and price snapshots
+payments
+provider references, amount and status
+invoices
+invoice number, order, totals, document reference
+sessions
+conference, track, date/time, room, chairs
+presentation_assignments
+session, abstract, time, order
+speakers
+profile and conference participation
+session_speakers
+session, speaker, role
+checkins
+registration, conference, timestamp, type
+attendance
+registration, session, timestamp
+certificates
+type, number, verification code, file
+files
+storage key, metadata, owner context
+notifications
+recipient, type, payload, read state
+email_templates
+conference/org scope, event, subject/body
+audit_logs
+actor, tenant, entity, action, old/new values
+28. Security Requirements
+All production traffic must use TLS.
+Passwords must be hashed using a modern password hashing algorithm; plaintext passwords must never be stored.
+Session and refresh tokens must be stored/handled securely and preferably use HTTP-only, Secure cookies for browser-based sessions.
+All input must be validated and normalized at API boundaries.
+Authorization must be server-side; UI hiding is not a security control.
+Rate limiting must protect login, password reset, public forms, webhooks and high-cost endpoints.
+Webhook endpoints must validate signatures and implement idempotency.
+Sensitive secrets must be managed through environment/secret managers, not source control.
+File upload endpoints must enforce MIME/type, size and ownership constraints.
+Exports, support access and impersonation must be auditable.
+Production database backups must be enabled and restore procedures tested.
+28.1 Threat Model Priorities
+Threat
+Primary Mitigation
+Cross-tenant data leakage
+Tenant context, authorization guards, repository scoping, tests
+Credential compromise
+Strong hashing, session controls, MFA readiness, rate limits
+Payment tampering
+Provider signature verification, server-side totals, idempotency
+Unauthorized exports
+Permission checks + audit logs
+Malicious uploads
+Type/size validation, object isolation, optional AV scanning
+Broken access control
+Central permission guards + negative authorization tests
+Data loss
+Automated backups + tested restore
+29. Privacy and Compliance Requirements
+The platform will process personal data including names, email addresses, phone numbers, affiliations, payment-related references and attendance. Exact legal obligations depend on customer geography and event type; the product must therefore provide configurable retention and privacy controls rather than assuming one jurisdiction.
+Collect only fields needed for stated event purposes.
+Document a privacy policy and consent language for public registrations where required.
+Provide controlled data export for customer administrators.
+Provide deletion/anonymization tools subject to legal, financial and audit retention requirements.
+Avoid exposing participant contact details publicly unless explicitly configured.
+Retain financial records according to applicable legal/accounting policy.
+Separate operational audit logs from user-visible profile data.
+30. Non-Functional Requirements
+Area
+Requirement
+Performance
+Typical authenticated CRUD APIs should target low hundreds of milliseconds server processing under normal load; exact SLA to be measured by endpoint class.
+Scalability
+System must support multiple organizations and conferences without tenant-specific deployments.
+Availability
+Production target >= 99.9% monthly for core API/web services, excluding planned maintenance where contractually permitted.
+Reliability
+Background jobs must be retryable and idempotent where side effects could duplicate.
+Maintainability
+Domain modules must have clear ownership and tests; shared code belongs in packages only when genuinely reusable.
+Security
+Tenant isolation and authorization tests are release blockers.
+Observability
+Errors must include correlation identifiers and enough context for support diagnosis.
+Accessibility
+Target WCAG 2.1 AA practices for customer-facing interfaces.
+Internationalization
+Date/time/currency/timezone must be modeled explicitly; UI localization can be phased.
+Backup
+Automated database backup with documented recovery point/recovery time objectives.
+Portability
+Provider integrations abstracted to enable replacement of payment/email/storage vendors.
+31. Error Handling and Resilience
+Use consistent error codes/messages suitable for frontend consumption.
+Never expose stack traces or secrets to end users.
+Retry transient external-provider errors with controlled backoff in workers.
+Do not retry non-idempotent operations without an idempotency strategy.
+Provider webhooks must be safe against duplicate delivery.
+Long-running exports should report job status instead of holding open HTTP connections.
+System should degrade gracefully when optional services such as email are unavailable; critical transaction data must still persist.
+32. Observability and Supportability
+Sentry for frontend/backend exception monitoring.
+Structured server logs with request/correlation ID.
+Metrics for API latency, error rate, queue backlog, database connections, job failures and webhook failures.
+Audit logs for security and business critical actions.
+Health endpoints for API and dependency readiness.
+Queue dead-letter/error inspection process.
+Operational dashboards for event-day check-in services.
+33. DevOps, Environments and Deployment
+Environment
+Purpose
+Database
+Local
+Developer machine
+Local PostgreSQL
+Development
+Shared integration
+Dedicated dev DB
+Staging
+Production-like QA
+Dedicated staging DB
+Production
+Customer workloads
+Production DB with backups
+33.1 CI/CD Pipeline
+Git Push / Pull Request
+  -> Install dependencies
+  -> Lint
+  -> Typecheck
+  -> Unit tests
+  -> Integration tests
+  -> Build web/api/worker
+  -> Migration checks
+  -> Deploy staging
+  -> Smoke tests
+  -> Manual/approved production release
+Docker images for API and worker in production.
+Vercel or equivalent for Next.js is acceptable initially.
+Managed PostgreSQL and Redis are preferred for production over self-managed stateful containers.
+Infrastructure must use separate secrets/configuration per environment.
+34. QA and Testing Strategy
+Layer
+Tools / Approach
+Examples
+Unit
+Jest/Vitest
+Pricing, permissions, status transitions
+Integration
+NestJS testing + test DB
+Tenant queries, payment state, review workflow
+API
+Supertest / contract checks
+HTTP behavior and authorization
+E2E
+Playwright
+Author submission, reviewer review, registration, check-in
+Security
+Negative authorization tests
+Cross-tenant access, role restrictions
+Load
+k6 or equivalent
+Abstract list, registration, check-in endpoints
+34.1 Release Blockers
+Any known cross-tenant data access issue.
+Payment webhook duplication can create duplicate registration/payment state.
+Unauthorized user can approve/reject submissions.
+Reviewer can see protected data in blind-review mode.
+Critical data loss or migration failure.
+Core event-day check-in unavailable without documented workaround.
+35. UX/UI Requirements
+Organizer dashboard should surface the next operational actions, not only vanity metrics.
+Conference navigation should be consistent across modules.
+Submission forms should show progress, validation and save state.
+Reviewer UI should minimize distractions and clearly expose due date, conflict status and submission state.
+Registration checkout should be linear, transparent about price and resilient to refresh/back navigation.
+Event-day check-in should prioritize large touch targets, fast search and clear success/failure feedback.
+Destructive operations require confirmation and, where practical, typed confirmation for high-impact actions.
+36. Accessibility
+Keyboard navigation for core workflows.
+Visible focus states.
+Semantic form labels and error messages.
+Color must not be the sole method of conveying status.
+Adequate contrast.
+Accessible tables and headings.
+Accessible modal/dialog behavior.
+QR/check-in UI should still offer manual alternative.
+37. Mobile and Responsive Requirements
+The initial product is web-first and responsive. Participant and event-day interfaces should be optimized for mobile browsers. Organizer back-office workflows may be desktop-first but must remain usable on tablet-sized screens.
+38. Data Migration and Import/Export
+CSV import for authors/participants, reviewers and pre-existing registrations where approved.
+Import validation must provide row-level errors and a downloadable error report.
+Imports should execute as background jobs for large files.
+Exports should include a schema/version marker where practical.
+Historical import operations must be auditable.
+39. Release Phases and MVP
+Phase
+Scope
+Exit Condition
+Phase 0
+Repo, monorepo, Docker, DB, Redis, CI foundation
+Applications boot locally; DB migration pipeline works
+Phase 1
+Auth, Organization, RBAC, Conference
+Tenant-safe conference creation and management works
+Phase 2
+Abstract submission, authors, tracks, dynamic form
+Authors can submit versioned abstracts end-to-end
+Phase 3
+Reviewer management, assignments, reviews, decisions
+Complete review lifecycle works with blind mode
+Phase 4
+Registration, pricing, payment, invoice
+Paid registration is reliable and auditable
+Phase 5
+Sessions, speakers, schedule, check-in, certificates
+Conference can run operationally
+Phase 6
+Reports, sponsors, advanced notifications
+Operational and commercial management enhanced
+Phase 7
+AI, mobile, integrations
+Advanced differentiation and scale features
+40. Future Enhancements
+AI-assisted abstract quality checks and reviewer recommendations.
+Similarity/duplicate detection using embeddings.
+AI-assisted program clustering and schedule suggestions.
+Native mobile app for attendees and organizers.
+WhatsApp communication integrations.
+Advanced CRM for exhibitors/sponsors.
+Multi-language conference sites.
+Enterprise SSO/SAML.
+Fine-grained data residency options.
+Offline-tolerant event-day check-in mode.
+OpenSearch for advanced cross-field search.
+Public API and partner ecosystem.
+41. Acceptance and Definition of Done
+Feature meets documented functional requirements and acceptance criteria.
+API and database changes are covered by appropriate automated tests.
+Authorization and tenant isolation tests exist for affected endpoints.
+Migrations are repeatable and reviewed.
+UI handles loading, empty, validation, error and success states.
+Audit events exist for required sensitive actions.
+Background jobs are observable and retry-safe where applicable.
+OpenAPI documentation is updated for public/internal API changes.
+Accessibility and responsive behavior are checked for affected screens.
+Feature is deployed to staging and passes smoke tests before production release.
+42. Assumptions, Risks and Open Decisions
+42.1 Assumptions
+The first product is web-first.
+The platform uses PostgreSQL as the primary system of record.
+Payment provider integrations are modular and can begin with Razorpay for India-focused customers.
+The same core event model will support academic, medical, association and corporate events with configuration.
+42.2 Key Risks
+Risk
+Impact
+Mitigation
+Scope explosion
+High
+Build MVP around abstract + review + registration + event operations
+Weak tenant isolation
+Critical
+Central tenant context + repository scoping + negative tests
+Payment edge cases
+High
+Provider adapter, webhook verification, idempotency, reconciliation
+Event-day performance
+High
+Lightweight check-in APIs, caching, load testing, operational fallback
+Over-customization
+High
+Form/configuration engine rather than customer-specific code
+Large exports/reports
+Medium
+Asynchronous jobs and secure download links
+Data/privacy requirements vary
+Medium
+Configurable retention/privacy controls and legal review for target markets
+42.3 Open Decisions to Finalize Before Production
+1. Authentication strategy: custom auth vs managed identity provider for enterprise customers.
+2. Primary storage provider: AWS S3 vs Cloudflare R2.
+3. Initial hosting: Vercel + managed backend platform vs AWS from day one.
+4. Payment scope: Razorpay first, Stripe first, or both in initial release.
+5. Exact certificate template engine and PDF generation approach.
+6. Whether public conference websites live under tenant subdomains, custom domains or both.
+7. Data retention periods by entity and target jurisdiction.
+8. Enterprise requirements such as SSO/SAML and organization-level audit exports.
+Appendix A - Initial API Modules
+auth
+users
+organizations
+roles
+permissions
+conferences
+conference-settings
+tracks
+abstracts
+authors
+reviewers
+reviews
+decisions
+registrations
+pricing
+orders
+payments
+invoices
+sessions
+speakers
+presentations
+attendance
+checkins
+certificates
+sponsors
+exhibitors
+notifications
+files
+reports
+audit
+Appendix B - Recommended Status Enums
+Domain
+Statuses
+Organization
+ACTIVE, SUSPENDED, ARCHIVED
+User
+INVITED, ACTIVE, SUSPENDED, DEACTIVATED
+Conference
+DRAFT, OPEN, REVIEW, REGISTRATION, ONGOING, COMPLETED, ARCHIVED
+Abstract
+DRAFT, SUBMITTED, SCREENING, UNDER_REVIEW, REVISION_REQUIRED, RESUBMITTED, ACCEPTED, REJECTED, WAITLISTED, SCHEDULED, PRESENTED, WITHDRAWN
+Review assignment
+PENDING, IN_PROGRESS, COMPLETED, DECLINED, OVERDUE, CANCELLED
+Registration
+PENDING, CONFIRMED, CANCELLED, REFUNDED, CHECKED_IN
+Order
+PENDING, PAID, FAILED, CANCELLED, PARTIALLY_REFUNDED, REFUNDED
+Payment
+INITIATED, PENDING, SUCCESS, FAILED, CANCELLED, REFUNDED
+Certificate
+ELIGIBLE, GENERATED, ISSUED, REVOKED
+Appendix C - Example End-to-End Journey
+A conference manager creates “Operant Medical Summit 2027”, defines two tracks and publishes a configurable abstract form. An author creates an account, adds co-authors, saves a draft, then submits before the deadline. The system assigns the abstract to three reviewers based on track and expertise while excluding declared conflicts. Reviewers complete scores; the track chair marks the abstract “Revision Required”. The author submits version two. The chair then marks it “Accepted - Oral”. The author receives an acceptance notice and registers using an author category. Payment is confirmed through a provider webhook, a registration number and QR are generated, and an invoice is issued. The conference manager assigns the accepted abstract to Session 4. On event day, registration staff scan the attendee QR, record check-in and optionally print a badge. After participation, the certificate job verifies eligibility and generates a PDF with a unique verification code. The attendee can validate the certificate publicly without exposing unnecessary personal information.
+End of Software Requirements Specification

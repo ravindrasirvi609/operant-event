@@ -29,6 +29,18 @@ task-by-task layer gets generated fresh, phase by phase.
 | 6 | [06-reports-sponsors-notifications.md](06-reports-sponsors-notifications.md) | Phase 6 | Operational and commercial management enhanced |
 | 7 | [07-future-scope.md](07-future-scope.md) | Phase 7 | Advanced differentiation and scale features |
 
+These files above cover `apps/api`'s schema/service/controller shape
+only. Two sibling plan sets, written after all 7 backend phases were
+implemented and verified, cover the rest of the stack at the same
+altitude, grounded in the real (not originally-sketched) API surface:
+
+- **[`frontend/`](frontend/README.md)** — `apps/web`, one file per
+  backend phase, plus a Phase 0 covering the auth/proxy/design-system
+  plumbing every later frontend phase depends on.
+- **[`worker/`](worker/README.md)** — `apps/worker`'s BullMQ processors,
+  one file per backend phase that actually introduced async work
+  (3 through 6), plus a Phase 0 covering shared queue conventions.
+
 ## Cross-phase rules (apply to every phase below)
 
 These come from SRS §7.1 (Tenant Isolation), §28 (Security) and §5
