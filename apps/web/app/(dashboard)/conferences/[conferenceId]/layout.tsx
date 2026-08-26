@@ -12,6 +12,7 @@ const TABS = [
   { href: '/settings', label: 'Settings' },
   { href: '/tracks', label: 'Tracks' },
   { href: '/form-builder', label: 'Form builder' },
+  { href: '/abstracts', label: 'Abstracts' },
 ];
 
 export default function ConferenceLayout({
@@ -38,7 +39,7 @@ export default function ConferenceLayout({
           <nav className="flex gap-4 border-b">
             {TABS.map((tab) => {
               const href = `/conferences/${conferenceId}${tab.href}`;
-              const isActive = pathname === href;
+              const isActive = tab.href === '' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
               return (
                 <Link
                   key={tab.href}
