@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaymentsService } from './payments.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
 import type { PaymentProvider } from './providers/payment-provider.interface';
@@ -15,7 +16,10 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     payment: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
     order: { update: jest.fn(), findFirst: jest.fn() },
     registration: { update: jest.fn() },
-    conference: { findFirst: jest.fn() },
+    conference: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+    },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -34,6 +38,10 @@ function fakeInvoices(
     generateForOrder: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as InvoicesService;
+}
+
+function fakeEventEmitter(): EventEmitter2 {
+  return { emit: jest.fn() } as unknown as EventEmitter2;
 }
 
 function fakeProvider(
@@ -61,6 +69,7 @@ describe('PaymentsService.handleWebhook', () => {
       fakePrisma(),
       new Map(),
       fakeInvoices(),
+      fakeEventEmitter(),
     );
 
     await expect(
@@ -78,6 +87,7 @@ describe('PaymentsService.handleWebhook', () => {
       prisma,
       new Map([['razorpay', provider]]),
       fakeInvoices(),
+      fakeEventEmitter(),
     );
 
     await expect(
@@ -98,6 +108,7 @@ describe('PaymentsService.handleWebhook', () => {
       prisma,
       new Map([['razorpay', provider]]),
       fakeInvoices(),
+      fakeEventEmitter(),
     );
 
     await service.handleWebhook('razorpay', '{}', 'sig');
@@ -105,14 +116,20 @@ describe('PaymentsService.handleWebhook', () => {
     expect(paymentUpdate).not.toHaveBeenCalled();
   });
 
-  it('on a SUCCESS event: marks the payment SUCCESS, the order PAID, and the registration CONFIRMED, then generates the invoice', async () => {
+  it('on a SUCCESS event: marks the payment SUCCESS, the order PAID, and the registration CONFIRMED, then generates the invoice and emits payment.succeeded', async () => {
     const paymentUpdate = jest.fn().mockResolvedValue(undefined);
-    const orderUpdate = jest
+    const orderUpdate = jest.fn().mockResolvedValue({
+      id: 'order-1',
+      registrationId: 'reg-1',
+      conferenceId: 'conf-1',
+      orderNumber: 'ORD-000001',
+    });
+    const registrationUpdate = jest
       .fn()
-      .mockResolvedValue({ id: 'order-1', registrationId: 'reg-1' });
-    const registrationUpdate = jest.fn().mockResolvedValue(undefined);
+      .mockResolvedValue({ userId: 'user-1' });
     const provider = fakeProvider();
     const invoices = fakeInvoices();
+    const eventEmitter = fakeEventEmitter();
     const prisma = fakePrisma({
       payment: {
         findFirst: jest
@@ -127,6 +144,7 @@ describe('PaymentsService.handleWebhook', () => {
       prisma,
       new Map([['razorpay', provider]]),
       invoices,
+      eventEmitter,
     );
 
     await service.handleWebhook('razorpay', '{}', 'sig');
@@ -151,13 +169,20 @@ describe('PaymentsService.handleWebhook', () => {
       },
     });
     expect(invoices.generateForOrder).toHaveBeenCalledWith('order-1');
+    expect(eventEmitter.emit).toHaveBeenCalledWith('payment.succeeded', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-1',
+      templateData: { orderNumber: 'ORD-000001' },
+    });
   });
 
-  it('on a FAILED event: marks the payment FAILED and never confirms the order, registration, or invoice', async () => {
+  it('on a FAILED event: marks the payment FAILED and never confirms the order, registration, or invoice, and never emits payment.succeeded', async () => {
     const paymentUpdate = jest.fn().mockResolvedValue(undefined);
     const orderUpdate = jest.fn();
     const registrationUpdate = jest.fn();
     const invoices = fakeInvoices();
+    const eventEmitter = fakeEventEmitter();
     const provider = fakeProvider({
       parseWebhookEvent: jest.fn().mockReturnValue({
         eventId: 'pay_abc',
@@ -182,6 +207,7 @@ describe('PaymentsService.handleWebhook', () => {
       prisma,
       new Map([['razorpay', provider]]),
       invoices,
+      eventEmitter,
     );
 
     await service.handleWebhook('razorpay', '{}', 'sig');
@@ -193,6 +219,7 @@ describe('PaymentsService.handleWebhook', () => {
     expect(orderUpdate).not.toHaveBeenCalled();
     expect(registrationUpdate).not.toHaveBeenCalled();
     expect(invoices.generateForOrder).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException when no Payment row matches the provider order id', async () => {
@@ -207,6 +234,7 @@ describe('PaymentsService.handleWebhook', () => {
       prisma,
       new Map([['razorpay', provider]]),
       fakeInvoices(),
+      fakeEventEmitter(),
     );
 
     await expect(
@@ -223,7 +251,12 @@ describe('PaymentsService.submitManualPaymentProof', () => {
         update: jest.fn(),
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.submitManualPaymentProof('user-1', 'order-x', {
@@ -246,7 +279,12 @@ describe('PaymentsService.submitManualPaymentProof', () => {
       },
       payment: { create, findFirst: jest.fn(), update: jest.fn() },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await service.submitManualPaymentProof('user-1', 'order-1', {
       reference: 'UTR123',
@@ -275,7 +313,12 @@ describe('PaymentsService.approveManualPayment', () => {
         update: jest.fn(),
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.approveManualPayment('org-1', 'order-x', 'staff-1'),
@@ -291,20 +334,31 @@ describe('PaymentsService.approveManualPayment', () => {
         update: jest.fn(),
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.approveManualPayment('org-1', 'order-1', 'staff-1'),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('promotes an existing PENDING manual claim to SUCCESS, confirms the order/registration, and generates the invoice', async () => {
+  it('promotes an existing PENDING manual claim to SUCCESS, confirms the order/registration, generates the invoice, and emits payment.succeeded', async () => {
     const paymentUpdate = jest.fn().mockResolvedValue(undefined);
-    const orderUpdate = jest
+    const orderUpdate = jest.fn().mockResolvedValue({
+      id: 'order-1',
+      registrationId: 'reg-1',
+      conferenceId: 'conf-1',
+      orderNumber: 'ORD-000001',
+    });
+    const registrationUpdate = jest
       .fn()
-      .mockResolvedValue({ id: 'order-1', registrationId: 'reg-1' });
-    const registrationUpdate = jest.fn().mockResolvedValue(undefined);
+      .mockResolvedValue({ userId: 'user-1' });
     const invoices = fakeInvoices();
+    const eventEmitter = fakeEventEmitter();
     const prisma = fakePrisma({
       order: {
         findFirst: jest
@@ -330,7 +384,12 @@ describe('PaymentsService.approveManualPayment', () => {
       },
       registration: { update: registrationUpdate },
     });
-    const service = new PaymentsService(prisma, new Map(), invoices);
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      invoices,
+      eventEmitter,
+    );
 
     await service.approveManualPayment('org-1', 'order-1', 'staff-1');
 
@@ -354,6 +413,12 @@ describe('PaymentsService.approveManualPayment', () => {
       },
     });
     expect(invoices.generateForOrder).toHaveBeenCalledWith('order-1');
+    expect(eventEmitter.emit).toHaveBeenCalledWith('payment.succeeded', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-1',
+      templateData: { orderNumber: 'ORD-000001' },
+    });
   });
 
   it('creates a fresh SUCCESS payment when the registrant never submitted a claim first', async () => {
@@ -376,9 +441,16 @@ describe('PaymentsService.approveManualPayment', () => {
         create: paymentCreate,
         update: jest.fn(),
       },
-      registration: { update: jest.fn() },
+      registration: {
+        update: jest.fn().mockResolvedValue({ userId: 'user-1' }),
+      },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await service.approveManualPayment('org-1', 'order-1', 'staff-1');
 
@@ -410,7 +482,12 @@ describe('PaymentsService.rejectManualPayment', () => {
         update: jest.fn(),
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.rejectManualPayment('org-1', 'order-1', 'staff-1'),
@@ -431,7 +508,12 @@ describe('PaymentsService.rejectManualPayment', () => {
         update,
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await service.rejectManualPayment('org-1', 'order-1', 'staff-1');
 
@@ -452,7 +534,12 @@ describe('PaymentsService.refund', () => {
         update: jest.fn(),
       },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.refund('org-1', 'order-1', 'staff-1'),
@@ -478,7 +565,12 @@ describe('PaymentsService.refund', () => {
       },
       registration: { update: registrationUpdate },
     });
-    const service = new PaymentsService(prisma, new Map(), fakeInvoices());
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
 
     await service.refund('org-1', 'order-1', 'staff-1');
 

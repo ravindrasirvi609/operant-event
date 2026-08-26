@@ -16,6 +16,12 @@ export const PERMISSIONS = {
   PROGRAM_MANAGE: 'program.manage',
   CHECKIN_MANAGE: 'checkin.manage',
   CERTIFICATE_MANAGE: 'certificate.manage',
+  SPONSOR_MANAGE: 'sponsor.manage',
+  EXHIBITOR_MANAGE: 'exhibitor.manage',
+  EMAIL_TEMPLATE_MANAGE: 'email_template.manage',
+  REPORT_VIEW: 'report.view',
+  EXPORT_MANAGE: 'export.manage',
+  IMPORT_MANAGE: 'import.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -39,6 +45,12 @@ export const PERMISSION_CATALOGUE: Array<{ module: string; action: string }> = [
   { module: 'program', action: 'manage' },
   { module: 'checkin', action: 'manage' },
   { module: 'certificate', action: 'manage' },
+  { module: 'sponsor', action: 'manage' },
+  { module: 'exhibitor', action: 'manage' },
+  { module: 'email_template', action: 'manage' },
+  { module: 'report', action: 'view' },
+  { module: 'export', action: 'manage' },
+  { module: 'import', action: 'manage' },
 ];
 
 export interface SystemRoleDefinition {
@@ -71,6 +83,12 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.PROGRAM_MANAGE,
       PERMISSIONS.CHECKIN_MANAGE,
       PERMISSIONS.CERTIFICATE_MANAGE,
+      PERMISSIONS.SPONSOR_MANAGE,
+      PERMISSIONS.EXHIBITOR_MANAGE,
+      PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+      PERMISSIONS.REPORT_VIEW,
+      PERMISSIONS.EXPORT_MANAGE,
+      PERMISSIONS.IMPORT_MANAGE,
     ],
   },
   {
@@ -94,6 +112,12 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.PROGRAM_MANAGE,
       PERMISSIONS.CHECKIN_MANAGE,
       PERMISSIONS.CERTIFICATE_MANAGE,
+      PERMISSIONS.SPONSOR_MANAGE,
+      PERMISSIONS.EXHIBITOR_MANAGE,
+      PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+      PERMISSIONS.REPORT_VIEW,
+      PERMISSIONS.EXPORT_MANAGE,
+      PERMISSIONS.IMPORT_MANAGE,
     ],
   },
   {
@@ -110,6 +134,12 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.PROGRAM_MANAGE,
       PERMISSIONS.CHECKIN_MANAGE,
       PERMISSIONS.CERTIFICATE_MANAGE,
+      PERMISSIONS.SPONSOR_MANAGE,
+      PERMISSIONS.EXHIBITOR_MANAGE,
+      PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+      PERMISSIONS.REPORT_VIEW,
+      PERMISSIONS.EXPORT_MANAGE,
+      PERMISSIONS.IMPORT_MANAGE,
     ],
   },
   {

@@ -1,6 +1,11 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { AbstractsService } from './abstracts.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
+
+function fakeEventEmitter(): EventEmitter2 {
+  return { emit: jest.fn() } as unknown as EventEmitter2;
+}
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
@@ -44,10 +49,14 @@ describe('AbstractsService.createDraft', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).createDraft('conf-x', 'user-1', {
-        title: 'A study',
-        submissionType: 'ORAL',
-      }),
+      new AbstractsService(prisma, fakeEventEmitter()).createDraft(
+        'conf-x',
+        'user-1',
+        {
+          title: 'A study',
+          submissionType: 'ORAL',
+        },
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -60,11 +69,15 @@ describe('AbstractsService.createDraft', () => {
       abstract: { create, count: jest.fn().mockResolvedValue(0) },
     });
 
-    await new AbstractsService(prisma).createDraft('conf-1', 'user-1', {
-      title: 'A study',
-      submissionType: 'ORAL',
-      trackId: 'track-1',
-    });
+    await new AbstractsService(prisma, fakeEventEmitter()).createDraft(
+      'conf-1',
+      'user-1',
+      {
+        title: 'A study',
+        submissionType: 'ORAL',
+        trackId: 'track-1',
+      },
+    );
 
     expect(create).toHaveBeenCalledWith({
       data: {
@@ -87,7 +100,10 @@ describe('AbstractsService.findAllForOrganizer', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).findAllForOrganizer('org-1', 'conf-x'),
+      new AbstractsService(prisma, fakeEventEmitter()).findAllForOrganizer(
+        'org-1',
+        'conf-x',
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -102,7 +118,10 @@ describe('AbstractsService.findAllForOrganizer', () => {
       abstract: { findMany },
     });
 
-    await new AbstractsService(prisma).findAllForOrganizer('org-1', 'conf-1');
+    await new AbstractsService(prisma, fakeEventEmitter()).findAllForOrganizer(
+      'org-1',
+      'conf-1',
+    );
 
     expect(findMany).toHaveBeenCalledWith({
       where: { conferenceId: 'conf-1' },
@@ -124,9 +143,13 @@ describe('AbstractsService.saveVersion', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).saveVersion('someone-else', 'abs-1', {
-        formData: {},
-      }),
+      new AbstractsService(prisma, fakeEventEmitter()).saveVersion(
+        'someone-else',
+        'abs-1',
+        {
+          formData: {},
+        },
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -140,9 +163,13 @@ describe('AbstractsService.saveVersion', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).saveVersion('user-1', 'abs-1', {
-        formData: {},
-      }),
+      new AbstractsService(prisma, fakeEventEmitter()).saveVersion(
+        'user-1',
+        'abs-1',
+        {
+          formData: {},
+        },
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -155,9 +182,13 @@ describe('AbstractsService.saveVersion', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).saveVersion('user-1', 'abs-1', {
-        formData: { background: 42 }, // wrong type, but "background" isn't even a known key here
-      }),
+      new AbstractsService(prisma, fakeEventEmitter()).saveVersion(
+        'user-1',
+        'abs-1',
+        {
+          formData: { background: 42 }, // wrong type, but "background" isn't even a known key here
+        },
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -180,10 +211,14 @@ describe('AbstractsService.saveVersion', () => {
       },
     });
 
-    await new AbstractsService(prisma).saveVersion('user-1', 'abs-1', {
-      title: 'Updated title',
-      formData: { title: 'Some background text' },
-    });
+    await new AbstractsService(prisma, fakeEventEmitter()).saveVersion(
+      'user-1',
+      'abs-1',
+      {
+        title: 'Updated title',
+        formData: { title: 'Some background text' },
+      },
+    );
 
     expect(versionCreate).toHaveBeenCalledWith({
       data: {
@@ -220,9 +255,13 @@ describe('AbstractsService.saveVersion', () => {
       },
     });
 
-    await new AbstractsService(prisma).saveVersion('user-1', 'abs-1', {
-      formData: { title: 'Revised background text' },
-    });
+    await new AbstractsService(prisma, fakeEventEmitter()).saveVersion(
+      'user-1',
+      'abs-1',
+      {
+        formData: { title: 'Revised background text' },
+      },
+    );
 
     expect(versionCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -237,6 +276,7 @@ describe('AbstractsService.submit', () => {
     id: 'abs-1',
     conferenceId: 'conf-1',
     submittedBy: 'user-1',
+    title: 'My Paper',
     status: 'DRAFT',
     currentVersionId: 'version-1',
   };
@@ -261,12 +301,89 @@ describe('AbstractsService.submit', () => {
       },
     });
 
-    await new AbstractsService(prisma).submit('user-1', 'abs-1', false);
+    await new AbstractsService(prisma, fakeEventEmitter()).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 'abs-1' },
       data: { status: 'RESUBMITTED', submittedAt: expect.any(Date) },
     });
+  });
+
+  it('emits abstract.submitted (resubmission) with the organization resolved from the conference', async () => {
+    const update = jest
+      .fn()
+      .mockResolvedValue({ id: 'abs-1', status: 'RESUBMITTED' });
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ ...draftAbstract, status: 'REVISION_REQUIRED' }),
+        update,
+      },
+      abstractVersion: {
+        findFirst: jest.fn().mockResolvedValue({ formData: { title: 'x' } }),
+      },
+      conference: {
+        findUnique: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+        findFirst: jest.fn(),
+      },
+      conferenceSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      conferenceFormField: {
+        findMany: jest.fn().mockResolvedValue([titleField]),
+      },
+    });
+
+    await new AbstractsService(prisma, eventEmitter).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('abstract.submitted', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-1',
+      templateData: { abstractTitle: 'My Paper' },
+    });
+  });
+
+  it('does not emit abstract.submitted when the conference no longer exists', async () => {
+    const update = jest
+      .fn()
+      .mockResolvedValue({ id: 'abs-1', status: 'RESUBMITTED' });
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ ...draftAbstract, status: 'REVISION_REQUIRED' }),
+        update,
+      },
+      abstractVersion: {
+        findFirst: jest.fn().mockResolvedValue({ formData: { title: 'x' } }),
+      },
+      conference: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn(),
+      },
+      conferenceSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      conferenceFormField: {
+        findMany: jest.fn().mockResolvedValue([titleField]),
+      },
+    });
+
+    await new AbstractsService(prisma, eventEmitter).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
   it('rejects submitting an abstract with no saved version yet', async () => {
@@ -279,7 +396,11 @@ describe('AbstractsService.submit', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).submit('user-1', 'abs-1', false),
+      new AbstractsService(prisma, fakeEventEmitter()).submit(
+        'user-1',
+        'abs-1',
+        false,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -300,7 +421,11 @@ describe('AbstractsService.submit', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).submit('user-1', 'abs-1', false),
+      new AbstractsService(prisma, fakeEventEmitter()).submit(
+        'user-1',
+        'abs-1',
+        false,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -326,7 +451,11 @@ describe('AbstractsService.submit', () => {
       },
     });
 
-    await new AbstractsService(prisma).submit('user-1', 'abs-1', true);
+    await new AbstractsService(prisma, fakeEventEmitter()).submit(
+      'user-1',
+      'abs-1',
+      true,
+    );
 
     expect(update).toHaveBeenCalled();
   });
@@ -344,7 +473,11 @@ describe('AbstractsService.submit', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).submit('user-1', 'abs-1', false),
+      new AbstractsService(prisma, fakeEventEmitter()).submit(
+        'user-1',
+        'abs-1',
+        false,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -369,7 +502,11 @@ describe('AbstractsService.submit', () => {
       },
     });
 
-    await new AbstractsService(prisma).submit('user-1', 'abs-1', false);
+    await new AbstractsService(prisma, fakeEventEmitter()).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 'abs-1' },
@@ -378,6 +515,46 @@ describe('AbstractsService.submit', () => {
         submittedAt: expect.any(Date),
         submissionNumber: 'A-000001',
       },
+    });
+  });
+
+  it('emits abstract.submitted after a first-time submit', async () => {
+    const update = jest.fn().mockResolvedValue({
+      id: 'abs-1',
+      status: 'SUBMITTED',
+      submissionNumber: 'A-000001',
+    });
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(draftAbstract),
+        update,
+        count: jest.fn().mockResolvedValue(0),
+      },
+      abstractVersion: {
+        findFirst: jest.fn().mockResolvedValue({ formData: { title: 'x' } }),
+      },
+      conference: {
+        findUnique: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+        findFirst: jest.fn(),
+      },
+      conferenceSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      conferenceFormField: {
+        findMany: jest.fn().mockResolvedValue([titleField]),
+      },
+    });
+
+    await new AbstractsService(prisma, eventEmitter).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('abstract.submitted', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-1',
+      templateData: { abstractTitle: 'My Paper' },
     });
   });
 
@@ -401,7 +578,11 @@ describe('AbstractsService.submit', () => {
       },
     });
 
-    await new AbstractsService(prisma).submit('user-1', 'abs-1', false);
+    await new AbstractsService(prisma, fakeEventEmitter()).submit(
+      'user-1',
+      'abs-1',
+      false,
+    );
 
     expect(update).toHaveBeenCalledTimes(2);
     expect(update.mock.calls[0][0].data.submissionNumber).toBe('A-000001');
@@ -416,7 +597,11 @@ describe('AbstractsService.forceSubmit', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).forceSubmit('org-1', 'conf-x', 'abs-1'),
+      new AbstractsService(prisma, fakeEventEmitter()).forceSubmit(
+        'org-1',
+        'conf-x',
+        'abs-1',
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -448,7 +633,11 @@ describe('AbstractsService.forceSubmit', () => {
       },
     });
 
-    await new AbstractsService(prisma).forceSubmit('org-1', 'conf-1', 'abs-1');
+    await new AbstractsService(prisma, fakeEventEmitter()).forceSubmit(
+      'org-1',
+      'conf-1',
+      'abs-1',
+    );
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 'abs-1' },
@@ -477,7 +666,10 @@ describe('AbstractsService.withdraw', () => {
       },
     });
 
-    await new AbstractsService(prisma).withdraw('user-1', 'abs-1');
+    await new AbstractsService(prisma, fakeEventEmitter()).withdraw(
+      'user-1',
+      'abs-1',
+    );
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 'abs-1' },
@@ -497,7 +689,10 @@ describe('AbstractsService.withdraw', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).withdraw('user-1', 'abs-1'),
+      new AbstractsService(prisma, fakeEventEmitter()).withdraw(
+        'user-1',
+        'abs-1',
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -520,9 +715,11 @@ describe('AbstractsService.setAuthors', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).setAuthors('user-1', 'abs-1', [
-        { firstName: 'Ada', lastName: 'Lovelace' },
-      ]),
+      new AbstractsService(prisma, fakeEventEmitter()).setAuthors(
+        'user-1',
+        'abs-1',
+        [{ firstName: 'Ada', lastName: 'Lovelace' }],
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -539,7 +736,7 @@ describe('AbstractsService.setAuthors', () => {
       abstractAuthor: { deleteMany, createMany },
     });
 
-    await new AbstractsService(prisma).setAuthors(
+    await new AbstractsService(prisma, fakeEventEmitter()).setAuthors(
       'user-1',
       'abs-1',
       validAuthors,
@@ -576,7 +773,7 @@ describe('AbstractsService.setAuthors', () => {
     });
 
     await expect(
-      new AbstractsService(prisma).setAuthors(
+      new AbstractsService(prisma, fakeEventEmitter()).setAuthors(
         'someone-else',
         'abs-1',
         validAuthors,

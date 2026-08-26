@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bullmq';
+import Redis from 'ioredis';
+import type { Env } from '@operant-event/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
-import { EnvModule } from './common/env/env.module';
+import { EnvModule, ENV } from './common/env/env.module';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { RolesModule } from './roles/roles.module';
@@ -24,11 +28,27 @@ import { PresentationsModule } from './presentations/presentations.module';
 import { CheckinsModule } from './checkins/checkins.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { CertificatesModule } from './certificates/certificates.module';
+import { SponsorsModule } from './sponsors/sponsors.module';
+import { ExhibitorsModule } from './exhibitors/exhibitors.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReportsModule } from './reports/reports.module';
+import { ExportsModule } from './exports/exports.module';
+import { ImportsModule } from './imports/imports.module';
 
 @Module({
   imports: [
     EnvModule,
     PrismaModule,
+    EventEmitterModule.forRoot(),
+    BullModule.forRootAsync({
+      inject: [ENV],
+      useFactory: (env: Env) => ({
+        connection: new Redis(env.REDIS_URL, {
+          maxRetriesPerRequest: null,
+          lazyConnect: true,
+        }),
+      }),
+    }),
     AuthModule,
     OrganizationsModule,
     RolesModule,
@@ -50,6 +70,12 @@ import { CertificatesModule } from './certificates/certificates.module';
     CheckinsModule,
     AttendanceModule,
     CertificatesModule,
+    SponsorsModule,
+    ExhibitorsModule,
+    NotificationsModule,
+    ReportsModule,
+    ExportsModule,
+    ImportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

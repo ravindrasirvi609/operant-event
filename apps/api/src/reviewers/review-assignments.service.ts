@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ConflictOfInterestService } from './conflict-of-interest.service';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 
 export interface ReviewerAbstractProjection {
   id: string;
@@ -35,6 +37,7 @@ export class ReviewAssignmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly conflictOfInterest: ConflictOfInterestService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async assign(
@@ -62,7 +65,7 @@ export class ReviewAssignmentsService {
       );
     }
 
-    return this.prisma.reviewAssignment.create({
+    const assignment = await this.prisma.reviewAssignment.create({
       data: {
         conferenceId,
         abstractId,
@@ -72,6 +75,13 @@ export class ReviewAssignmentsService {
         conflictOfInterest: false,
       },
     });
+    await this.emitReviewAssigned(
+      organizationId,
+      conferenceId,
+      reviewerId,
+      abstract.title,
+    );
+    return assignment;
   }
 
   /** Cancels the old assignment and creates a fresh one, keeping a pointer back for audit history (REV-002). */
@@ -107,7 +117,7 @@ export class ReviewAssignmentsService {
       data: { status: 'CANCELLED' },
     });
 
-    return this.prisma.reviewAssignment.create({
+    const newAssignment = await this.prisma.reviewAssignment.create({
       data: {
         conferenceId: oldAssignment.conferenceId,
         abstractId: oldAssignment.abstractId,
@@ -117,6 +127,43 @@ export class ReviewAssignmentsService {
         conflictOfInterest: false,
         reassignedFromId: assignmentId,
       },
+    });
+
+    const abstract = await this.prisma.abstract.findUnique({
+      where: { id: oldAssignment.abstractId },
+      select: { title: true },
+    });
+    if (abstract) {
+      await this.emitReviewAssigned(
+        organizationId,
+        oldAssignment.conferenceId,
+        newReviewerId,
+        abstract.title,
+      );
+    }
+
+    return newAssignment;
+  }
+
+  /** §20 trigger: "Review assigned". No-ops silently if the reviewer has since been removed. */
+  private async emitReviewAssigned(
+    organizationId: string,
+    conferenceId: string,
+    reviewerId: string,
+    abstractTitle: string,
+  ): Promise<void> {
+    const reviewer = await this.prisma.reviewer.findUnique({
+      where: { id: reviewerId },
+      select: { userId: true },
+    });
+    if (!reviewer) {
+      return;
+    }
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.REVIEW_ASSIGNED, {
+      organizationId,
+      conferenceId,
+      userId: reviewer.userId,
+      templateData: { abstractTitle },
     });
   }
 

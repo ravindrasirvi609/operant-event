@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { DecisionsService } from './decisions.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
 
@@ -18,10 +19,16 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   return base as unknown as PrismaService;
 }
 
+function fakeEventEmitter(): EventEmitter2 {
+  return { emit: jest.fn() } as unknown as EventEmitter2;
+}
+
 const abstractInOrg = {
   id: 'abs-1',
   conferenceId: 'conf-1',
   currentVersionId: 'version-3',
+  submittedBy: 'author-1',
+  title: 'A Study',
 };
 
 describe('DecisionsService.recordDecision', () => {
@@ -31,9 +38,14 @@ describe('DecisionsService.recordDecision', () => {
     });
 
     await expect(
-      new DecisionsService(prisma).recordDecision('org-1', 'abs-x', 'user-1', {
-        decision: 'ACCEPTED',
-      }),
+      new DecisionsService(prisma, fakeEventEmitter()).recordDecision(
+        'org-1',
+        'abs-x',
+        'user-1',
+        {
+          decision: 'ACCEPTED',
+        },
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -50,7 +62,7 @@ describe('DecisionsService.recordDecision', () => {
       abstractDecision: { create: decisionCreate },
     });
 
-    await new DecisionsService(prisma).recordDecision(
+    await new DecisionsService(prisma, fakeEventEmitter()).recordDecision(
       'org-1',
       'abs-1',
       'chair-1',
@@ -89,7 +101,7 @@ describe('DecisionsService.recordDecision', () => {
       },
     });
 
-    await new DecisionsService(prisma).recordDecision(
+    await new DecisionsService(prisma, fakeEventEmitter()).recordDecision(
       'org-1',
       'abs-1',
       'chair-1',
@@ -100,6 +112,63 @@ describe('DecisionsService.recordDecision', () => {
       where: { id: 'abs-1' },
       data: { status: 'WAITLISTED' },
     });
+  });
+
+  it('emits abstract.accepted when the decision is ACCEPTED', async () => {
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(abstractInOrg),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: 'abs-1', status: 'ACCEPTED' }),
+      },
+      abstractDecision: {
+        create: jest.fn().mockResolvedValue({ id: 'decision-1' }),
+      },
+    });
+
+    await new DecisionsService(prisma, eventEmitter).recordDecision(
+      'org-1',
+      'abs-1',
+      'chair-1',
+      {
+        decision: 'ACCEPTED',
+      },
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('abstract.accepted', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'author-1',
+      templateData: { abstractTitle: 'A Study' },
+    });
+  });
+
+  it('does not emit abstract.accepted for any other decision', async () => {
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(abstractInOrg),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: 'abs-1', status: 'REJECTED' }),
+      },
+      abstractDecision: {
+        create: jest.fn().mockResolvedValue({ id: 'decision-1' }),
+      },
+    });
+
+    await new DecisionsService(prisma, eventEmitter).recordDecision(
+      'org-1',
+      'abs-1',
+      'chair-1',
+      {
+        decision: 'REJECTED',
+      },
+    );
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 });
 
@@ -117,7 +186,7 @@ describe('DecisionsService.requestRevision', () => {
       abstractRevisionRequest: { create: revisionCreate },
     });
 
-    await new DecisionsService(prisma).requestRevision(
+    await new DecisionsService(prisma, fakeEventEmitter()).requestRevision(
       'org-1',
       'abs-1',
       'chair-1',
@@ -138,5 +207,42 @@ describe('DecisionsService.requestRevision', () => {
       where: { id: 'abs-1' },
       data: { status: 'REVISION_REQUIRED' },
     });
+  });
+
+  it('emits abstract.revision_required with the reason as template data', async () => {
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(abstractInOrg),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: 'abs-1', status: 'REVISION_REQUIRED' }),
+      },
+      abstractRevisionRequest: {
+        create: jest.fn().mockResolvedValue({ id: 'revision-1' }),
+      },
+    });
+
+    await new DecisionsService(prisma, eventEmitter).requestRevision(
+      'org-1',
+      'abs-1',
+      'chair-1',
+      {
+        reason: 'Please revise the methodology section.',
+      },
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'abstract.revision_required',
+      {
+        organizationId: 'org-1',
+        conferenceId: 'conf-1',
+        userId: 'author-1',
+        templateData: {
+          abstractTitle: 'A Study',
+          reason: 'Please revise the methodology section.',
+        },
+      },
+    );
   });
 });

@@ -75,6 +75,10 @@ model Organization {
   files        File[]
   auditLogs    AuditLog[]
   reviewers    Reviewer[]
+  emailTemplates EmailTemplate[]
+  notifications  Notification[]
+  exportJobs     ExportJob[]
+  importJobs     ImportJob[]
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
 
@@ -234,6 +238,8 @@ model Conference {
   checkins       Checkin[]
   attendances    Attendance[]
   certificates   Certificate[]
+  sponsors       Sponsor[]
+  exhibitors     Exhibitor[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -867,4 +873,120 @@ model Certificate {
   @@unique([registrationId, certificateType])
   @@index([conferenceId, status])
   @@map("certificates")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Sponsors/Exhibitors, Notifications, Reports, Export/Import
+// Spec: docs/plans/06-reports-sponsors-notifications.md
+// ---------------------------------------------------------------------------
+
+model Sponsor {
+  id            String @id @default(cuid())
+  conferenceId  String
+  name          String
+  tier          String // PLATINUM | GOLD | SILVER | BRONZE
+  contactName   String?
+  contactEmail  String?
+  paymentStatus String @default("PENDING")
+  logoFileId    String?
+  conference    Conference @relation(fields: [conferenceId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([conferenceId])
+  @@map("sponsors")
+}
+
+model Exhibitor {
+  id            String @id @default(cuid())
+  conferenceId  String
+  companyName   String
+  boothNumber   String?
+  contactPerson String?
+  paymentStatus String @default("PENDING")
+  conference    Conference @relation(fields: [conferenceId], references: [id])
+  staff         ExhibitorStaff[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([conferenceId])
+  @@map("exhibitors")
+}
+
+model ExhibitorStaff {
+  id          String @id @default(cuid())
+  exhibitorId String
+  name        String
+  email       String?
+  exhibitor   Exhibitor @relation(fields: [exhibitorId], references: [id])
+
+  @@index([exhibitorId])
+  @@map("exhibitor_staff")
+}
+
+model EmailTemplate {
+  id             String  @id @default(cuid())
+  organizationId String
+  conferenceId   String? // null = organization-wide default, overridable per conference
+  event          String  // matches a notification trigger event name, e.g. "abstract.accepted"
+  subject        String
+  body           String  // template source; variables like {{participantName}}
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, conferenceId, event])
+  @@map("email_templates")
+}
+
+model Notification {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String
+  title          String
+  message        String
+  data           Json?
+  readAt         DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model ExportJob {
+  id             String   @id @default(cuid())
+  organizationId String
+  conferenceId   String?
+  requestedBy    String
+  type           String   // ABSTRACTS | REGISTRATIONS | PAYMENTS | AUDIT_LOG | ...
+  status         String   @default("QUEUED") // QUEUED | RUNNING | DONE | FAILED
+  resultFileId   String?
+  error          String?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  @@index([organizationId, status])
+  @@map("export_jobs")
+}
+
+model ImportJob {
+  id                String   @id @default(cuid())
+  organizationId    String
+  conferenceId      String?
+  requestedBy       String
+  type              String   // AUTHORS | REVIEWERS | REGISTRATIONS
+  status            String   @default("QUEUED")
+  sourceFileId      String
+  errorReportFileId String?
+  rowsProcessed     Int      @default(0)
+  rowsFailed        Int      @default(0)
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  createdAt         DateTime @default(now())
+  completedAt       DateTime?
+
+  @@index([organizationId, status])
+  @@map("import_jobs")
 }

@@ -3,12 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { validateAbstractFormData } from '../conference-form-fields/abstract-form-validator';
 import { validateAuthorFlags } from './abstract-authors.util';
 import { formatSubmissionNumber } from './submission-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 import type { CreateAbstractDto } from './dto/create-abstract.dto';
 import type { SaveVersionDto } from './dto/save-version.dto';
 import type { AuthorInputDto } from './dto/set-authors.dto';
@@ -25,7 +27,10 @@ const MAX_SUBMISSION_NUMBER_ATTEMPTS = 5;
 
 @Injectable()
 export class AbstractsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async createDraft(
     conferenceId: string,
@@ -157,6 +162,8 @@ export class AbstractsService {
     abstract: {
       id: string;
       conferenceId: string;
+      submittedBy: string;
+      title: string;
       status: string;
       currentVersionId: string | null;
     },
@@ -203,17 +210,40 @@ export class AbstractsService {
     // A resubmission keeps its existing submission number — it's the same
     // slot, just revised content — and only a first-time submit needs one
     // assigned.
-    if (abstract.status === 'REVISION_REQUIRED') {
-      return this.prisma.abstract.update({
-        where: { id: abstract.id },
-        data: { status: 'RESUBMITTED', submittedAt: new Date() },
-      });
-    }
+    const updated =
+      abstract.status === 'REVISION_REQUIRED'
+        ? await this.prisma.abstract.update({
+            where: { id: abstract.id },
+            data: { status: 'RESUBMITTED', submittedAt: new Date() },
+          })
+        : await this.assignSubmissionNumberAndSubmit(
+            abstract.conferenceId,
+            abstract.id,
+          );
 
-    return this.assignSubmissionNumberAndSubmit(
-      abstract.conferenceId,
-      abstract.id,
-    );
+    await this.emitAbstractSubmitted(abstract);
+    return updated;
+  }
+
+  /** §20 trigger: "Abstract submitted". No-ops silently if the conference has since been deleted. */
+  private async emitAbstractSubmitted(abstract: {
+    conferenceId: string;
+    submittedBy: string;
+    title: string;
+  }): Promise<void> {
+    const conference = await this.prisma.conference.findUnique({
+      where: { id: abstract.conferenceId },
+      select: { organizationId: true },
+    });
+    if (!conference) {
+      return;
+    }
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.ABSTRACT_SUBMITTED, {
+      organizationId: conference.organizationId,
+      conferenceId: abstract.conferenceId,
+      userId: abstract.submittedBy,
+      templateData: { abstractTitle: abstract.title },
+    });
   }
 
   async withdraw(submittedBy: string, abstractId: string) {

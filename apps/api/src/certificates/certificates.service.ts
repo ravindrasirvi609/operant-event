@@ -4,12 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Certificate } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CertificateEligibilityService } from './certificate-eligibility.service';
 import { formatSequenceNumber } from '../common/utils/sequence-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import { generateQrCode } from '../common/utils/qr-code.util';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 
 const CERTIFICATE_TYPES = [
   'PARTICIPATION',
@@ -26,6 +28,7 @@ export class CertificatesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eligibilityService: CertificateEligibilityService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -98,10 +101,22 @@ export class CertificatesService {
     if (certificate.status === 'ISSUED') {
       return certificate;
     }
-    return this.prisma.certificate.update({
+    const updated = await this.prisma.certificate.update({
       where: { id: certificateId },
       data: { status: 'ISSUED', issuedAt: new Date() },
     });
+
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.CERTIFICATE_ISSUED, {
+      organizationId,
+      conferenceId: certificate.conferenceId,
+      userId: certificate.registration.userId,
+      templateData: {
+        certificateType: certificate.certificateType,
+        certificateNumber: updated.certificateNumber,
+      },
+    });
+
+    return updated;
   }
 
   async findOwned(userId: string, certificateId: string) {
@@ -188,6 +203,7 @@ export class CertificatesService {
   ) {
     const certificate = await this.prisma.certificate.findFirst({
       where: { id: certificateId, conference: { organizationId } },
+      include: { registration: true },
     });
     if (!certificate) {
       throw new NotFoundException('Certificate not found.');

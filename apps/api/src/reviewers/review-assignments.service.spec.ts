@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReviewAssignmentsService } from './review-assignments.service';
 import { ConflictOfInterestService } from './conflict-of-interest.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
@@ -10,8 +11,8 @@ import type { PrismaService } from '../common/prisma/prisma.service';
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     conference: { findFirst: jest.fn() },
-    abstract: { findFirst: jest.fn() },
-    reviewer: { findMany: jest.fn() },
+    abstract: { findFirst: jest.fn(), findUnique: jest.fn() },
+    reviewer: { findMany: jest.fn(), findUnique: jest.fn() },
     reviewAssignment: {
       create: jest.fn(),
       findFirst: jest.fn(),
@@ -31,21 +32,30 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   return base as unknown as PrismaService;
 }
 
+function fakeEventEmitter(): EventEmitter2 {
+  return { emit: jest.fn() } as unknown as EventEmitter2;
+}
+
 function buildService(
   prisma: PrismaService,
   coiResult: { hasConflict: boolean; reasons: string[] } = {
     hasConflict: false,
     reasons: [],
   },
+  eventEmitter: EventEmitter2 = fakeEventEmitter(),
 ) {
   const coi = {
     check: jest.fn().mockResolvedValue(coiResult),
   } as unknown as ConflictOfInterestService;
-  return new ReviewAssignmentsService(prisma, coi);
+  return new ReviewAssignmentsService(prisma, coi, eventEmitter);
 }
 
 const conferenceInOrg = { id: 'conf-1', organizationId: 'org-1' };
-const abstractInConference = { id: 'abs-1', conferenceId: 'conf-1' };
+const abstractInConference = {
+  id: 'abs-1',
+  conferenceId: 'conf-1',
+  title: 'A Study',
+};
 
 describe('ReviewAssignmentsService.assign', () => {
   it('rejects assignment outside the caller organization', async () => {
@@ -102,6 +112,63 @@ describe('ReviewAssignmentsService.assign', () => {
       },
     });
   });
+
+  it('emits review.assigned for the reviewer once the assignment is created', async () => {
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(abstractInConference),
+      },
+      reviewer: {
+        findMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ userId: 'user-2' }),
+      },
+      reviewAssignment: {
+        create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
+      },
+    });
+
+    await buildService(prisma, undefined, eventEmitter).assign(
+      'org-1',
+      'conf-1',
+      'abs-1',
+      'reviewer-1',
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('review.assigned', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-2',
+      templateData: { abstractTitle: 'A Study' },
+    });
+  });
+
+  it('does not emit review.assigned when the reviewer no longer exists', async () => {
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
+      abstract: {
+        findFirst: jest.fn().mockResolvedValue(abstractInConference),
+      },
+      reviewer: {
+        findMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      reviewAssignment: {
+        create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
+      },
+    });
+
+    await buildService(prisma, undefined, eventEmitter).assign(
+      'org-1',
+      'conf-1',
+      'abs-1',
+      'reviewer-1',
+    );
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReviewAssignmentsService.reassign', () => {
@@ -138,6 +205,44 @@ describe('ReviewAssignmentsService.reassign', () => {
         conflictOfInterest: false,
         reassignedFromId: 'assignment-1',
       },
+    });
+  });
+
+  it('emits review.assigned for the new reviewer', async () => {
+    const oldAssignment = {
+      id: 'assignment-1',
+      conferenceId: 'conf-1',
+      abstractId: 'abs-1',
+    };
+    const eventEmitter = fakeEventEmitter();
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
+      abstract: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ title: 'A Study' }),
+      },
+      reviewer: {
+        findMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ userId: 'user-3' }),
+      },
+      reviewAssignment: {
+        findFirst: jest.fn().mockResolvedValue(oldAssignment),
+        update: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn().mockResolvedValue({ id: 'assignment-2' }),
+      },
+    });
+
+    await buildService(prisma, undefined, eventEmitter).reassign(
+      'org-1',
+      'assignment-1',
+      'reviewer-2',
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith('review.assigned', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-3',
+      templateData: { abstractTitle: 'A Study' },
     });
   });
 });

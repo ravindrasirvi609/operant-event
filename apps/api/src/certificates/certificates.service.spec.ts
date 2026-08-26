@@ -1,7 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { CertificatesService } from './certificates.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
 import type { CertificateEligibilityService } from './certificate-eligibility.service';
+
+function fakeEventEmitter(): EventEmitter2 {
+  return { emit: jest.fn() } as unknown as EventEmitter2;
+}
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
@@ -42,7 +47,11 @@ describe('CertificatesService.generateForConference', () => {
     const prisma = fakePrisma({
       conference: { findFirst: jest.fn().mockResolvedValue(null) },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.generateForConference('org-1', 'conf-x'),
@@ -56,7 +65,11 @@ describe('CertificatesService.generateForConference', () => {
         findUnique: jest.fn().mockResolvedValue({ certificateEnabled: false }),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(
       service.generateForConference('org-1', 'conf-1'),
@@ -82,6 +95,7 @@ describe('CertificatesService.generateForConference', () => {
     const service = new CertificatesService(
       prisma,
       fakeEligibility(isEligible),
+      fakeEventEmitter(),
     );
 
     await service.generateForConference('org-1', 'conf-1');
@@ -117,6 +131,7 @@ describe('CertificatesService.generateForConference', () => {
     const service = new CertificatesService(
       prisma,
       fakeEligibility(isEligible),
+      fakeEventEmitter(),
     );
 
     const created = await service.generateForConference('org-1', 'conf-1');
@@ -162,6 +177,7 @@ describe('CertificatesService.generateForConference', () => {
     const service = new CertificatesService(
       prisma,
       fakeEligibility(isEligible),
+      fakeEventEmitter(),
     );
 
     const created = await service.generateForConference('org-1', 'conf-1');
@@ -182,29 +198,44 @@ describe('CertificatesService.issue', () => {
         update: jest.fn(),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(service.issue('org-1', 'cert-x')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
-  it('transitions an ELIGIBLE certificate to ISSUED with an issuedAt timestamp', async () => {
-    const update = jest
-      .fn()
-      .mockResolvedValue({ id: 'cert-1', status: 'ISSUED' });
+  it('transitions an ELIGIBLE certificate to ISSUED with an issuedAt timestamp, and emits certificate.issued', async () => {
+    const update = jest.fn().mockResolvedValue({
+      id: 'cert-1',
+      status: 'ISSUED',
+      certificateNumber: 'CERT-000001',
+    });
+    const eventEmitter = fakeEventEmitter();
     const prisma = fakePrisma({
       certificate: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ id: 'cert-1', status: 'ELIGIBLE' }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'cert-1',
+          status: 'ELIGIBLE',
+          conferenceId: 'conf-1',
+          certificateType: 'PARTICIPATION',
+          registration: { userId: 'user-1' },
+        }),
         findUnique: jest.fn(),
         count: jest.fn(),
         create: jest.fn(),
         update,
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      eventEmitter,
+    );
 
     await service.issue('org-1', 'cert-1');
 
@@ -212,10 +243,20 @@ describe('CertificatesService.issue', () => {
       where: { id: 'cert-1' },
       data: { status: 'ISSUED', issuedAt: expect.any(Date) },
     });
+    expect(eventEmitter.emit).toHaveBeenCalledWith('certificate.issued', {
+      organizationId: 'org-1',
+      conferenceId: 'conf-1',
+      userId: 'user-1',
+      templateData: {
+        certificateType: 'PARTICIPATION',
+        certificateNumber: 'CERT-000001',
+      },
+    });
   });
 
-  it('is idempotent: issuing an already-ISSUED certificate does not update it again', async () => {
+  it('is idempotent: issuing an already-ISSUED certificate does not update it again or re-emit certificate.issued', async () => {
     const update = jest.fn();
+    const eventEmitter = fakeEventEmitter();
     const alreadyIssued = { id: 'cert-1', status: 'ISSUED' };
     const prisma = fakePrisma({
       certificate: {
@@ -226,11 +267,16 @@ describe('CertificatesService.issue', () => {
         update,
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      eventEmitter,
+    );
 
     const result = await service.issue('org-1', 'cert-1');
 
     expect(update).not.toHaveBeenCalled();
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
     expect(result).toBe(alreadyIssued);
   });
 });
@@ -246,7 +292,11 @@ describe('CertificatesService.findOwned', () => {
         update: jest.fn(),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(service.findOwned('user-1', 'cert-1')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -265,7 +315,11 @@ describe('CertificatesService.verifyByCode', () => {
         update: jest.fn(),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(service.verifyByCode('BADCODE')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -282,7 +336,11 @@ describe('CertificatesService.verifyByCode', () => {
         update: jest.fn(),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     await expect(service.verifyByCode('ABC123')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -313,7 +371,11 @@ describe('CertificatesService.verifyByCode', () => {
           .mockResolvedValue({ certificateShowFullName: true }),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     const result = await service.verifyByCode('ABC123');
 
@@ -350,7 +412,11 @@ describe('CertificatesService.verifyByCode', () => {
           .mockResolvedValue({ certificateShowFullName: false }),
       },
     });
-    const service = new CertificatesService(prisma, fakeEligibility());
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+    );
 
     const result = await service.verifyByCode('ABC123');
 

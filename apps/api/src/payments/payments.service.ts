@@ -7,6 +7,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import { generateQrCode } from '../common/utils/qr-code.util';
@@ -16,6 +17,7 @@ import {
 } from './providers/payment-provider.interface';
 import type { SubmitManualPaymentProofDto } from './dto/submit-manual-payment-proof.dto';
 import { InvoicesService } from '../invoices/invoices.service';
+import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
 
 const MAX_QR_CODE_ATTEMPTS = 5;
 
@@ -26,6 +28,7 @@ export class PaymentsService {
     @Inject(PAYMENT_PROVIDERS)
     private readonly providers: Map<string, PaymentProvider>,
     private readonly invoicesService: InvoicesService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -232,8 +235,9 @@ export class PaymentsService {
       where: { id: orderId },
       data: { status: 'PAID' },
     });
-    await this.confirmRegistration(order.registrationId);
+    const registration = await this.confirmRegistration(order.registrationId);
     await this.invoicesService.generateForOrder(orderId);
+    await this.emitPaymentSucceeded(order, registration.userId);
   }
 
   /**
@@ -245,9 +249,9 @@ export class PaymentsService {
   private async confirmRegistration(
     registrationId: string,
     attempt = 0,
-  ): Promise<void> {
+  ): Promise<{ userId: string }> {
     try {
-      await this.prisma.registration.update({
+      return await this.prisma.registration.update({
         where: { id: registrationId },
         data: { status: 'CONFIRMED', qrCode: generateQrCode() },
       });
@@ -256,11 +260,30 @@ export class PaymentsService {
         isUniqueConstraintViolation(error) &&
         attempt < MAX_QR_CODE_ATTEMPTS
       ) {
-        await this.confirmRegistration(registrationId, attempt + 1);
-        return;
+        return this.confirmRegistration(registrationId, attempt + 1);
       }
       throw error;
     }
+  }
+
+  /** §20 trigger: "Payment successful". No-ops silently if the conference has since been deleted. */
+  private async emitPaymentSucceeded(
+    order: { conferenceId: string; orderNumber: string },
+    userId: string,
+  ): Promise<void> {
+    const conference = await this.prisma.conference.findUnique({
+      where: { id: order.conferenceId },
+      select: { organizationId: true },
+    });
+    if (!conference) {
+      return;
+    }
+    this.eventEmitter.emit(NOTIFICATION_EVENTS.PAYMENT_SUCCEEDED, {
+      organizationId: conference.organizationId,
+      conferenceId: order.conferenceId,
+      userId,
+      templateData: { orderNumber: order.orderNumber },
+    });
   }
 
   private async assertOrderInOrganization(
