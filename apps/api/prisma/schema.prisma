@@ -49,6 +49,17 @@ enum ReviewMode {
   OPEN
 }
 
+/**
+ * GATEWAY: online payments through a configured provider (Razorpay/Stripe),
+ * confirmed only by a verified webhook. MANUAL: no gateway is configured
+ * for this conference — staff confirm payment received offline (bank
+ * transfer/cash/cheque) through an audited approval action instead.
+ */
+enum PaymentMode {
+  GATEWAY
+  MANUAL
+}
+
 model Organization {
   id           String                   @id @default(cuid())
   name         String
@@ -213,6 +224,9 @@ model Conference {
   tracks         ConferenceTrack[]
   formFields     ConferenceFormField[]
   abstracts      Abstract[]
+  registrationCategories RegistrationCategory[]
+  registrations  Registration[]
+  orders         Order[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -233,6 +247,7 @@ model ConferenceSetting {
   registrationStartDate DateTime?
   registrationEndDate   DateTime?
   paymentEnabled        Boolean    @default(false)
+  paymentMode           PaymentMode @default(MANUAL)
   certificateEnabled    Boolean    @default(false)
   checkinEnabled        Boolean    @default(false)
   conference            Conference @relation(fields: [conferenceId], references: [id])
@@ -538,4 +553,164 @@ model AbstractRevisionRequest {
 
   @@index([abstractId])
   @@map("abstract_revision_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Registration, Pricing, Payment, Invoice
+// Spec: docs/plans/04-registration-payments.md
+// ---------------------------------------------------------------------------
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+  CHECKED_IN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model RegistrationCategory {
+  id           String @id @default(cuid())
+  conferenceId String
+  name         String
+  description  String?
+  conference   Conference @relation(fields: [conferenceId], references: [id])
+  types        RegistrationType[]
+
+  @@index([conferenceId])
+  @@map("registration_categories")
+}
+
+model RegistrationType {
+  id            String   @id @default(cuid())
+  categoryId    String
+  name          String
+  price         Decimal  @db.Decimal(10, 2)
+  currency      String
+  startDate     DateTime
+  endDate       DateTime
+  capacity      Int?
+  category      RegistrationCategory @relation(fields: [categoryId], references: [id])
+  registrations Registration[]
+
+  @@index([categoryId, startDate, endDate])
+  @@map("registration_types")
+}
+
+model Registration {
+  id                 String   @id @default(cuid())
+  conferenceId       String
+  registrationNumber String   @unique
+  userId             String
+  registrationTypeId String
+  status             RegistrationStatus @default(PENDING)
+  totalAmount        Decimal  @db.Decimal(10, 2)
+  currency           String
+  registeredAt       DateTime @default(now())
+  conference         Conference @relation(fields: [conferenceId], references: [id])
+  registrationType   RegistrationType @relation(fields: [registrationTypeId], references: [id])
+  order              Order?
+
+  @@index([conferenceId, status])
+  @@index([registrationTypeId])
+  @@map("registrations")
+}
+
+model Order {
+  id             String @id @default(cuid())
+  conferenceId   String
+  registrationId String @unique
+  orderNumber    String @unique
+  subtotal       Decimal @db.Decimal(10, 2)
+  discount       Decimal @db.Decimal(10, 2) @default(0)
+  tax            Decimal @db.Decimal(10, 2) @default(0)
+  total          Decimal @db.Decimal(10, 2)
+  currency       String
+  status         OrderStatus @default(PENDING)
+  conference     Conference @relation(fields: [conferenceId], references: [id])
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  items          OrderItem[]
+  payments       Payment[]
+  invoice        Invoice?
+
+  @@index([conferenceId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String @id @default(cuid())
+  orderId      String
+  itemType     String
+  referenceId  String?
+  description  String
+  quantity     Int    @default(1)
+  unitPrice    Decimal @db.Decimal(10, 2)
+  totalPrice   Decimal @db.Decimal(10, 2)
+  order        Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                String @id @default(cuid())
+  orderId           String
+  provider          String // razorpay | stripe | MANUAL
+  providerOrderId   String?
+  providerPaymentId String? @unique
+  amount            Decimal @db.Decimal(10, 2)
+  currency          String
+  status            PaymentStatus @default(INITIATED)
+  reference         String? // e.g. bank transfer UTR / cheque number, manual mode only
+  proofFileId       String? // Files module reference, manual mode only
+  decidedBy         String? // staff user id who approved/rejected a manual claim
+  paidAt            DateTime?
+  order             Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id          String @id @default(cuid())
+  provider    String
+  eventId     String
+  payloadHash String
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@map("webhook_events")
+}
+
+model Invoice {
+  id             String @id @default(cuid())
+  invoiceNumber  String @unique
+  orderId        String @unique
+  subtotal       Decimal @db.Decimal(10, 2)
+  discount       Decimal @db.Decimal(10, 2)
+  tax            Decimal @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+  documentFileId String?
+  order          Order @relation(fields: [orderId], references: [id])
+  issuedAt       DateTime @default(now())
+
+  @@map("invoices")
 }

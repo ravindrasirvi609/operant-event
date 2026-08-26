@@ -8,7 +8,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const env = loadEnv();
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true preserves the exact bytes Razorpay/Stripe signed for
+  // webhook HMAC verification — JSON.stringify(req.body) would not
+  // reproduce them byte-for-byte (key order, whitespace).
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(

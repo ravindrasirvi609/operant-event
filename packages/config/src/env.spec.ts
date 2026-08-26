@@ -54,4 +54,19 @@ describe('loadEnv', () => {
     const env = loadEnv(validBase);
     expect(env.BCRYPT_SALT_ROUNDS).toBe(12);
   });
+
+  it('leaves payment gateway credentials undefined when not set — MANUAL-only deployments need none of them', () => {
+    const env = loadEnv(validBase);
+    expect(env.RAZORPAY_KEY_ID).toBeUndefined();
+    expect(env.RAZORPAY_KEY_SECRET).toBeUndefined();
+    expect(env.RAZORPAY_WEBHOOK_SECRET).toBeUndefined();
+    expect(env.STRIPE_SECRET_KEY).toBeUndefined();
+    expect(env.STRIPE_WEBHOOK_SECRET).toBeUndefined();
+  });
+
+  it('accepts payment gateway credentials when provided', () => {
+    const env = loadEnv({ ...validBase, RAZORPAY_KEY_ID: 'rzp_test_123', RAZORPAY_KEY_SECRET: 'secret' });
+    expect(env.RAZORPAY_KEY_ID).toBe('rzp_test_123');
+    expect(env.RAZORPAY_KEY_SECRET).toBe('secret');
+  });
 });

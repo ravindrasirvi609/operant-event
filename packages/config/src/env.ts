@@ -9,6 +9,14 @@ const envSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
+  // Optional: only needed by conferences configured for GATEWAY payment
+  // mode. MANUAL-only deployments (or ones only using one provider) need
+  // none or only half of these set.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

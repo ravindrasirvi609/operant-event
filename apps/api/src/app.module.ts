@@ -14,6 +14,10 @@ import { ConferenceFormFieldsModule } from './conference-form-fields/conference-
 import { AbstractsModule } from './abstracts/abstracts.module';
 import { ReviewersModule } from './reviewers/reviewers.module';
 import { DecisionsModule } from './decisions/decisions.module';
+import { RegistrationsModule } from './registrations/registrations.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
+import { InvoicesModule } from './invoices/invoices.module';
 
 @Module({
   imports: [
@@ -30,6 +34,10 @@ import { DecisionsModule } from './decisions/decisions.module';
     AbstractsModule,
     ReviewersModule,
     DecisionsModule,
+    RegistrationsModule,
+    OrdersModule,
+    PaymentsModule,
+    InvoicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

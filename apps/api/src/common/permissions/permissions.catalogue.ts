@@ -10,6 +10,9 @@ export const PERMISSIONS = {
   REVIEWER_MANAGE: 'reviewer.manage',
   REVIEW_ASSIGNMENT_MANAGE: 'review_assignment.manage',
   DECISION_RECORD: 'decision.record',
+  REGISTRATION_MANAGE: 'registration.manage',
+  PAYMENT_MANAGE: 'payment.manage',
+  PAYMENT_REFUND: 'payment.refund',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -27,6 +30,9 @@ export const PERMISSION_CATALOGUE: Array<{ module: string; action: string }> = [
   { module: 'reviewer', action: 'manage' },
   { module: 'review_assignment', action: 'manage' },
   { module: 'decision', action: 'record' },
+  { module: 'registration', action: 'manage' },
+  { module: 'payment', action: 'manage' },
+  { module: 'payment', action: 'refund' },
 ];
 
 export interface SystemRoleDefinition {
@@ -53,6 +59,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.REVIEWER_MANAGE,
       PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE,
       PERMISSIONS.DECISION_RECORD,
+      PERMISSIONS.REGISTRATION_MANAGE,
+      PERMISSIONS.PAYMENT_MANAGE,
+      PERMISSIONS.PAYMENT_REFUND,
     ],
   },
   {
@@ -70,6 +79,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.REVIEWER_MANAGE,
       PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE,
       PERMISSIONS.DECISION_RECORD,
+      PERMISSIONS.REGISTRATION_MANAGE,
+      PERMISSIONS.PAYMENT_MANAGE,
+      PERMISSIONS.PAYMENT_REFUND,
     ],
   },
   {
@@ -80,6 +92,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.CONFERENCE_READ,
       PERMISSIONS.CONFERENCE_UPDATE,
       PERMISSIONS.ABSTRACT_READ,
+      PERMISSIONS.REGISTRATION_MANAGE,
+      PERMISSIONS.PAYMENT_MANAGE,
+      PERMISSIONS.PAYMENT_REFUND,
     ],
   },
   {

@@ -7,10 +7,8 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { validateAbstractFormData } from '../conference-form-fields/abstract-form-validator';
 import { validateAuthorFlags } from './abstract-authors.util';
-import {
-  formatSubmissionNumber,
-  isUniqueConstraintViolation,
-} from './submission-number.util';
+import { formatSubmissionNumber } from './submission-number.util';
+import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import type { CreateAbstractDto } from './dto/create-abstract.dto';
 import type { SaveVersionDto } from './dto/save-version.dto';
 import type { AuthorInputDto } from './dto/set-authors.dto';
