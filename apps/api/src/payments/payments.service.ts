@@ -9,12 +9,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
+import { generateQrCode } from '../common/utils/qr-code.util';
 import {
   PAYMENT_PROVIDERS,
   type PaymentProvider,
 } from './providers/payment-provider.interface';
 import type { SubmitManualPaymentProofDto } from './dto/submit-manual-payment-proof.dto';
 import { InvoicesService } from '../invoices/invoices.service';
+
+const MAX_QR_CODE_ATTEMPTS = 5;
 
 @Injectable()
 export class PaymentsService {
@@ -229,11 +232,35 @@ export class PaymentsService {
       where: { id: orderId },
       data: { status: 'PAID' },
     });
-    await this.prisma.registration.update({
-      where: { id: order.registrationId },
-      data: { status: 'CONFIRMED' },
-    });
+    await this.confirmRegistration(order.registrationId);
     await this.invoicesService.generateForOrder(orderId);
+  }
+
+  /**
+   * Phase 5 (SRS §17): a Registration gets its check-in qrCode the moment
+   * it's confirmed. qrCode is globally unique, so a collision (astronomically
+   * unlikely at 8 random bytes) retries with a fresh code rather than
+   * failing the whole payment-confirmation flow.
+   */
+  private async confirmRegistration(
+    registrationId: string,
+    attempt = 0,
+  ): Promise<void> {
+    try {
+      await this.prisma.registration.update({
+        where: { id: registrationId },
+        data: { status: 'CONFIRMED', qrCode: generateQrCode() },
+      });
+    } catch (error) {
+      if (
+        isUniqueConstraintViolation(error) &&
+        attempt < MAX_QR_CODE_ATTEMPTS
+      ) {
+        await this.confirmRegistration(registrationId, attempt + 1);
+        return;
+      }
+      throw error;
+    }
   }
 
   private async assertOrderInOrganization(

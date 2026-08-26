@@ -18,6 +18,12 @@ import { RegistrationsModule } from './registrations/registrations.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { SessionsModule } from './sessions/sessions.module';
+import { SpeakersModule } from './speakers/speakers.module';
+import { PresentationsModule } from './presentations/presentations.module';
+import { CheckinsModule } from './checkins/checkins.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { CertificatesModule } from './certificates/certificates.module';
 
 @Module({
   imports: [
@@ -38,6 +44,12 @@ import { InvoicesModule } from './invoices/invoices.module';
     OrdersModule,
     PaymentsModule,
     InvoicesModule,
+    SessionsModule,
+    SpeakersModule,
+    PresentationsModule,
+    CheckinsModule,
+    AttendanceModule,
+    CertificatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

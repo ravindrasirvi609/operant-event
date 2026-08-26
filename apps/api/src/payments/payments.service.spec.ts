@@ -145,7 +145,10 @@ describe('PaymentsService.handleWebhook', () => {
     });
     expect(registrationUpdate).toHaveBeenCalledWith({
       where: { id: 'reg-1' },
-      data: { status: 'CONFIRMED' },
+      data: {
+        status: 'CONFIRMED',
+        qrCode: expect.stringMatching(/^[0-9A-F]{16}$/),
+      },
     });
     expect(invoices.generateForOrder).toHaveBeenCalledWith('order-1');
   });
@@ -345,7 +348,10 @@ describe('PaymentsService.approveManualPayment', () => {
     });
     expect(registrationUpdate).toHaveBeenCalledWith({
       where: { id: 'reg-1' },
-      data: { status: 'CONFIRMED' },
+      data: {
+        status: 'CONFIRMED',
+        qrCode: expect.stringMatching(/^[0-9A-F]{16}$/),
+      },
     });
     expect(invoices.generateForOrder).toHaveBeenCalledWith('order-1');
   });

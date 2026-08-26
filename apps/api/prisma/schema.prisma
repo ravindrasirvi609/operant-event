@@ -94,6 +94,7 @@ model User {
   sessions           Session[]
   passwordResets     PasswordResetToken[]
   emailVerifications EmailVerificationToken[]
+  registrations      Registration[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
 
@@ -218,6 +219,7 @@ model Conference {
   logoFileId     String?
   bannerFileId   String?
   status         ConferenceStatus  @default(DRAFT)
+  scheduleVersion Int              @default(0)
   createdBy      String
   organization   Organization      @relation(fields: [organizationId], references: [id])
   settings       ConferenceSetting?
@@ -227,6 +229,11 @@ model Conference {
   registrationCategories RegistrationCategory[]
   registrations  Registration[]
   orders         Order[]
+  sessions       ProgramSession[]
+  speakers       Speaker[]
+  checkins       Checkin[]
+  attendances    Attendance[]
+  certificates   Certificate[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -250,6 +257,10 @@ model ConferenceSetting {
   paymentMode           PaymentMode @default(MANUAL)
   certificateEnabled    Boolean    @default(false)
   checkinEnabled        Boolean    @default(false)
+  preventSpeakerOverlap Boolean    @default(false)
+  certificateAttendanceThreshold Int @default(1)
+  certificateReviewThreshold     Int @default(1)
+  certificateShowFullName        Boolean @default(true)
   conference            Conference @relation(fields: [conferenceId], references: [id])
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -267,6 +278,7 @@ model ConferenceTrack {
   status       String     @default("ACTIVE")
   conference   Conference @relation(fields: [conferenceId], references: [id])
   abstracts    Abstract[]
+  sessions     ProgramSession[]
 
   @@index([conferenceId])
   @@map("conference_tracks")
@@ -382,6 +394,7 @@ model Abstract {
   reviewAssignments      ReviewAssignment[]
   decisions              AbstractDecision[]
   revisionRequests       AbstractRevisionRequest[]
+  presentationAssignments PresentationAssignment[]
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 
@@ -623,10 +636,15 @@ model Registration {
   status             RegistrationStatus @default(PENDING)
   totalAmount        Decimal  @db.Decimal(10, 2)
   currency           String
+  qrCode             String?  @unique
   registeredAt       DateTime @default(now())
   conference         Conference @relation(fields: [conferenceId], references: [id])
   registrationType   RegistrationType @relation(fields: [registrationTypeId], references: [id])
+  user               User     @relation(fields: [userId], references: [id])
   order              Order?
+  checkins           Checkin[]
+  attendances        Attendance[]
+  certificates       Certificate[]
 
   @@index([conferenceId, status])
   @@index([registrationTypeId])
@@ -713,4 +731,140 @@ model Invoice {
   issuedAt       DateTime @default(now())
 
   @@map("invoices")
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5 — Program (Sessions/Speakers/Schedule), Check-in, Certificates
+// Spec: docs/plans/05-program-checkin-certificates.md
+//
+// The SRS calls the schedule-builder entity "Session" — renamed to
+// ProgramSession here because Phase 1 already defines a `Session` model
+// for JWT refresh-token sessions (auth), and Prisma model names must be
+// unique across the whole schema.
+// ---------------------------------------------------------------------------
+
+enum CertificateStatus {
+  ELIGIBLE
+  GENERATED
+  ISSUED
+  REVOKED
+}
+
+model ProgramSession {
+  id            String    @id @default(cuid())
+  conferenceId  String
+  trackId       String?
+  title         String
+  description   String?
+  room          String?
+  sessionDate   DateTime
+  startTime     DateTime
+  endTime       DateTime
+  sessionType   String?
+  chairId       String?
+  coChairId     String?
+  status        String    @default("DRAFT") // DRAFT | PUBLISHED
+  conference    Conference @relation(fields: [conferenceId], references: [id])
+  track         ConferenceTrack? @relation(fields: [trackId], references: [id])
+  speakers      SessionSpeaker[]
+  presentations PresentationAssignment[]
+  attendances   Attendance[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([conferenceId, sessionDate])
+  @@map("program_sessions")
+}
+
+model Speaker {
+  id           String @id @default(cuid())
+  conferenceId String
+  userId       String?
+  name         String
+  designation  String?
+  institution  String?
+  bio          String?
+  photoFileId  String?
+  country      String?
+  conference   Conference @relation(fields: [conferenceId], references: [id])
+  sessions     SessionSpeaker[]
+
+  @@index([conferenceId])
+  @@map("speakers")
+}
+
+model SessionSpeaker {
+  sessionId String
+  speakerId String
+  role      String // SPEAKER | CHAIR | CO_CHAIR | KEYNOTE
+  session   ProgramSession @relation(fields: [sessionId], references: [id])
+  speaker   Speaker        @relation(fields: [speakerId], references: [id])
+
+  @@id([sessionId, speakerId, role])
+  @@map("session_speakers")
+}
+
+model PresentationAssignment {
+  id               String   @id @default(cuid())
+  sessionId        String
+  abstractId       String
+  presentationType String?
+  startTime        DateTime
+  endTime          DateTime
+  sortOrder        Int      @default(0)
+  session          ProgramSession @relation(fields: [sessionId], references: [id])
+  abstract         Abstract       @relation(fields: [abstractId], references: [id])
+
+  @@unique([sessionId, abstractId])
+  @@index([abstractId])
+  @@map("presentation_assignments")
+}
+
+model Checkin {
+  id             String   @id @default(cuid())
+  conferenceId   String
+  registrationId String
+  checkinType    String   // MAIN_EVENT | WORKSHOP | SESSION | BANQUET
+  checkedInAt    DateTime @default(now())
+  deviceId       String?
+  conference     Conference   @relation(fields: [conferenceId], references: [id])
+  registration   Registration @relation(fields: [registrationId], references: [id])
+
+  @@index([registrationId])
+  @@index([conferenceId, checkinType])
+  @@map("checkins")
+}
+
+model Attendance {
+  id             String   @id @default(cuid())
+  conferenceId   String
+  registrationId String
+  sessionId      String?
+  checkedInAt    DateTime @default(now())
+  conference     Conference     @relation(fields: [conferenceId], references: [id])
+  registration   Registration   @relation(fields: [registrationId], references: [id])
+  session        ProgramSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([registrationId])
+  @@index([sessionId])
+  @@map("attendances")
+}
+
+model Certificate {
+  id                String    @id @default(cuid())
+  conferenceId      String
+  registrationId    String
+  certificateType   String    // PARTICIPATION | PRESENTATION | SPEAKER | REVIEWER | CHAIR | WORKSHOP
+  certificateNumber String    @unique
+  fileId            String?
+  verificationCode  String    @unique
+  issuedAt          DateTime?
+  status            CertificateStatus @default(ELIGIBLE)
+  conference        Conference   @relation(fields: [conferenceId], references: [id])
+  registration      Registration @relation(fields: [registrationId], references: [id])
+  createdAt         DateTime  @default(now())
+
+  @@unique([registrationId, certificateType])
+  @@index([conferenceId, status])
+  @@map("certificates")
 }

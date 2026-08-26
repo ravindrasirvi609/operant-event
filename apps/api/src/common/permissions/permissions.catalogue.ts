@@ -13,6 +13,9 @@ export const PERMISSIONS = {
   REGISTRATION_MANAGE: 'registration.manage',
   PAYMENT_MANAGE: 'payment.manage',
   PAYMENT_REFUND: 'payment.refund',
+  PROGRAM_MANAGE: 'program.manage',
+  CHECKIN_MANAGE: 'checkin.manage',
+  CERTIFICATE_MANAGE: 'certificate.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -33,6 +36,9 @@ export const PERMISSION_CATALOGUE: Array<{ module: string; action: string }> = [
   { module: 'registration', action: 'manage' },
   { module: 'payment', action: 'manage' },
   { module: 'payment', action: 'refund' },
+  { module: 'program', action: 'manage' },
+  { module: 'checkin', action: 'manage' },
+  { module: 'certificate', action: 'manage' },
 ];
 
 export interface SystemRoleDefinition {
@@ -62,6 +68,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.REGISTRATION_MANAGE,
       PERMISSIONS.PAYMENT_MANAGE,
       PERMISSIONS.PAYMENT_REFUND,
+      PERMISSIONS.PROGRAM_MANAGE,
+      PERMISSIONS.CHECKIN_MANAGE,
+      PERMISSIONS.CERTIFICATE_MANAGE,
     ],
   },
   {
@@ -82,6 +91,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.REGISTRATION_MANAGE,
       PERMISSIONS.PAYMENT_MANAGE,
       PERMISSIONS.PAYMENT_REFUND,
+      PERMISSIONS.PROGRAM_MANAGE,
+      PERMISSIONS.CHECKIN_MANAGE,
+      PERMISSIONS.CERTIFICATE_MANAGE,
     ],
   },
   {
@@ -95,6 +107,9 @@ export const SYSTEM_ROLES: SystemRoleDefinition[] = [
       PERMISSIONS.REGISTRATION_MANAGE,
       PERMISSIONS.PAYMENT_MANAGE,
       PERMISSIONS.PAYMENT_REFUND,
+      PERMISSIONS.PROGRAM_MANAGE,
+      PERMISSIONS.CHECKIN_MANAGE,
+      PERMISSIONS.CERTIFICATE_MANAGE,
     ],
   },
   {
