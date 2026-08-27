@@ -18,3 +18,18 @@ export async function uploadFile(file: File, fetchImpl: typeof fetch = fetch): P
   const uploaded = await parseApiResponse<UploadedFile>(response);
   return uploaded.id;
 }
+
+/**
+ * Hits the organizer-facing `files` route (org-scoped, `x-organization-id`
+ * header attached by the proxy). Required for import source files
+ * specifically: `ImportsService.create` validates `sourceFileId` against
+ * `File.organizationId` — a `files/self` upload has `organizationId: null`
+ * and would fail that check.
+ */
+export async function uploadFileToOrganization(file: File, fetchImpl: typeof fetch = fetch): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetchImpl('/api/proxy/files', { method: 'POST', body: formData });
+  const uploaded = await parseApiResponse<UploadedFile>(response);
+  return uploaded.id;
+}

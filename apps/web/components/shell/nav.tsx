@@ -40,6 +40,9 @@ export function Nav() {
               Members
             </DropdownMenuItem>
             <DropdownMenuItem render={<Link href={`/organizations/${activeOrgId}/roles`} />}>Roles</DropdownMenuItem>
+            <DropdownMenuItem render={<Link href={`/organizations/${activeOrgId}/email-templates`} />}>
+              Email templates
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}

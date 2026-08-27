@@ -21,6 +21,11 @@ const TABS = [
   { href: '/speakers', label: 'Speakers' },
   { href: '/checkins', label: 'Check-ins' },
   { href: '/certificates', label: 'Certificates' },
+  { href: '/sponsors', label: 'Sponsors' },
+  { href: '/exhibitors', label: 'Exhibitors' },
+  { href: '/reports', label: 'Reports' },
+  { href: '/exports', label: 'Exports' },
+  { href: '/imports', label: 'Imports' },
 ];
 
 export default function ConferenceLayout({
