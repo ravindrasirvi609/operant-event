@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PaymentModeBranch } from '@/components/registrations/payment-mode-branch';
 import { ApiError } from '@/lib/api/backend';
 import { useCreateOrder } from '@/hooks/use-orders';
-import { cacheOrderResult, readCachedOrderResult } from '@/lib/registrations/order-cache';
+import { cacheOrderResult } from '@/lib/registrations/order-cache';
+import { useCachedOrderResult } from '@/lib/registrations/use-cached-order-result';
 import type { CreateOrderResult } from '@/lib/registrations/types';
 
 /**
@@ -22,14 +23,12 @@ import type { CreateOrderResult } from '@/lib/registrations/types';
  * below rather than silently treated as "no order yet."
  */
 export function CheckoutFlow({ registrationId }: { registrationId: string }) {
-  const [orderResult, setOrderResult] = useState<CreateOrderResult | null>(null);
+  const cachedOrderResult = useCachedOrderResult(registrationId);
+  const [createdOrderResult, setCreatedOrderResult] = useState<CreateOrderResult | null>(null);
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const createOrder = useCreateOrder(registrationId);
-
-  useEffect(() => {
-    setOrderResult(readCachedOrderResult(registrationId));
-  }, [registrationId]);
+  const orderResult = createdOrderResult ?? cachedOrderResult;
 
   async function handlePayNow() {
     setError(null);
@@ -37,7 +36,7 @@ export function CheckoutFlow({ registrationId }: { registrationId: string }) {
     try {
       const result = await createOrder.mutateAsync(undefined);
       cacheOrderResult(registrationId, result);
-      setOrderResult(result);
+      setCreatedOrderResult(result);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setConflict(true);
