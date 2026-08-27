@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { formatSequenceNumber } from '../common/utils/sequence-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
@@ -115,6 +116,43 @@ export class OrdersService {
     });
 
     return { order, checkoutUrl: checkout.checkoutUrl };
+  }
+
+  /** Owner-facing read: Order has no userId column, so ownership is checked via the registration relation. */
+  async findOwned(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, registration: { userId } },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found.');
+    }
+    return order;
+  }
+
+  async findForOrganizer(organizationId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, conference: { organizationId } },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found.');
+    }
+    return order;
+  }
+
+  /** Fixes the real gap behind `<PendingPaymentsQueue>`: lists orders for a conference, optionally by status. */
+  async findAllForOrganizer(
+    organizationId: string,
+    conferenceId: string,
+    status?: OrderStatus,
+  ) {
+    return this.prisma.order.findMany({
+      where: {
+        conferenceId,
+        conference: { organizationId },
+        ...(status !== undefined && { status }),
+      },
+      include: { payments: true },
+    });
   }
 
   private async createOrderWithRetry(

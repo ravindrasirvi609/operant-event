@@ -12,15 +12,16 @@ import type { CreateOrderResult } from '@/lib/registrations/types';
 
 /**
  * SRS §35 requires checkout to survive a hard refresh from server state.
- * That's only partially possible here: there is no `GET
- * orders/:orderId` or `GET registrations/:registrationId/orders`
- * endpoint, so once an order exists, the frontend has no way to look it
- * up again except the sessionStorage cache written right after creation
- * (see `lib/registrations/order-cache.ts`). A refresh in the *same*
- * browser tab resumes correctly; a refresh after clearing storage, or
- * from a different device, does not — the order still exists
- * server-side, but nothing here can display it. That case is disclosed
- * below rather than silently treated as "no order yet."
+ * `GET orders/:orderId` now exists, so once the order id is known, its
+ * status/invoice resume correctly from the server (see
+ * `<OrderStatusView>`). What's still missing is a `GET
+ * registrations/:registrationId/orders` — there is no way to look up an
+ * *existing* order's id from just a registration id, so the order id
+ * itself is only ever known from the create response, cached client-side
+ * (`lib/registrations/order-cache.ts`) as a same-tab mitigation. A
+ * refresh after clearing storage, or from a different device, loses the
+ * id (not the order, which still exists) — disclosed below rather than
+ * silently treated as "no order yet."
  */
 export function CheckoutFlow({ registrationId }: { registrationId: string }) {
   const cachedOrderResult = useCachedOrderResult(registrationId);
@@ -50,10 +51,7 @@ export function CheckoutFlow({ registrationId }: { registrationId: string }) {
     return (
       <div className="space-y-4">
         <PaymentModeBranch orderResult={orderResult} orderId={orderResult.order.id} />
-        <Link
-          href={`/orders/${orderResult.order.id}?registrationId=${registrationId}`}
-          className="text-sm text-muted-foreground underline"
-        >
+        <Link href={`/orders/${orderResult.order.id}`} className="text-sm text-muted-foreground underline">
           View order status
         </Link>
       </div>
@@ -63,9 +61,9 @@ export function CheckoutFlow({ registrationId }: { registrationId: string }) {
   if (conflict) {
     return (
       <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
-        An order already exists for this registration, but it can&apos;t be redisplayed from here — no endpoint
-        exists yet to look up an existing order. Check your email for a gateway confirmation, or contact the
-        organizer with your registration number for manual payment status.
+        An order already exists for this registration, but its id isn&apos;t known here anymore — there is no
+        endpoint to look up an order by registration id, only by its own id. Check your email for a gateway
+        confirmation, or contact the organizer with your registration number for manual payment status.
       </p>
     );
   }

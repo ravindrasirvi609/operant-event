@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: Omit<ConferenceSetting, 'conferenceId'> = {
   registrationEndDate: null,
   paymentEnabled: false,
   paymentMode: 'MANUAL',
+  manualPaymentInstructions: null,
   certificateEnabled: false,
   checkinEnabled: false,
 };
@@ -51,6 +52,7 @@ export interface UpdateConferenceSettingsInput {
   registrationStartDate?: string;
   registrationEndDate?: string;
   paymentEnabled?: boolean;
+  manualPaymentInstructions?: string;
   certificateEnabled?: boolean;
   checkinEnabled?: boolean;
 }

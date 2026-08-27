@@ -25,6 +25,18 @@ export class RegistrationCategoriesService {
     });
   }
 
+  /**
+   * No organization check: a registrant browsing categories to register
+   * for has no org context, matching RegistrationsController's own
+   * registrant-facing routes.
+   */
+  async findAllForRegistration(conferenceId: string) {
+    return this.prisma.registrationCategory.findMany({
+      where: { conferenceId },
+      include: { types: true },
+    });
+  }
+
   private async assertConferenceInOrganization(
     organizationId: string,
     conferenceId: string,

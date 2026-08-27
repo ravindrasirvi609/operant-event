@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ConferenceFormFieldsController } from './conference-form-fields.controller';
+import {
+  ConferenceFormFieldsController,
+  SubmissionFormFieldsController,
+} from './conference-form-fields.controller';
 import { ConferenceFormFieldsService } from './conference-form-fields.service';
 
 @Module({
-  controllers: [ConferenceFormFieldsController],
+  controllers: [ConferenceFormFieldsController, SubmissionFormFieldsController],
   providers: [ConferenceFormFieldsService],
   exports: [ConferenceFormFieldsService],
 })

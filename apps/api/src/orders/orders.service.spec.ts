@@ -12,6 +12,8 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     registration: { findFirst: jest.fn() },
     order: {
       findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
@@ -229,6 +231,104 @@ describe('OrdersService.create', () => {
     expect(result).toEqual({
       order: { id: 'order-1', orderNumber: 'ORD-000001', currency: 'INR' },
       manualPaymentInstructions: true,
+    });
+  });
+});
+
+describe('OrdersService.findOwned', () => {
+  it('throws NotFoundException when the order does not belong to the caller', async () => {
+    const prisma = fakePrisma({
+      order: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      new OrdersService(prisma, new Map()).findOwned('user-1', 'order-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('finds the order via the registration relation, since Order has no userId column', async () => {
+    const findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'order-1', status: 'PENDING' });
+    const prisma = fakePrisma({ order: { findFirst } });
+
+    const result = await new OrdersService(prisma, new Map()).findOwned(
+      'user-1',
+      'order-1',
+    );
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'order-1', registration: { userId: 'user-1' } },
+    });
+    expect(result).toEqual({ id: 'order-1', status: 'PENDING' });
+  });
+});
+
+describe('OrdersService.findForOrganizer', () => {
+  it('throws NotFoundException when the order is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      order: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      new OrdersService(prisma, new Map()).findForOrganizer('org-1', 'order-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('finds the order scoped to the caller organization', async () => {
+    const findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 'order-1', status: 'PAID' });
+    const prisma = fakePrisma({ order: { findFirst } });
+
+    const result = await new OrdersService(prisma, new Map()).findForOrganizer(
+      'org-1',
+      'order-1',
+    );
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'order-1', conference: { organizationId: 'org-1' } },
+    });
+    expect(result).toEqual({ id: 'order-1', status: 'PAID' });
+  });
+});
+
+describe('OrdersService.findAllForOrganizer', () => {
+  it('lists orders scoped to the conference, optionally filtered by status', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: 'order-1' }]);
+    const prisma = fakePrisma({ order: { findMany } });
+
+    const result = await new OrdersService(
+      prisma,
+      new Map(),
+    ).findAllForOrganizer('org-1', 'conf-1', 'PENDING');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        conferenceId: 'conf-1',
+        conference: { organizationId: 'org-1' },
+        status: 'PENDING',
+      },
+      include: { payments: true },
+    });
+    expect(result).toEqual([{ id: 'order-1' }]);
+  });
+
+  it('omits the status filter when none is given', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = fakePrisma({ order: { findMany } });
+
+    await new OrdersService(prisma, new Map()).findAllForOrganizer(
+      'org-1',
+      'conf-1',
+    );
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        conferenceId: 'conf-1',
+        conference: { organizationId: 'org-1' },
+      },
+      include: { payments: true },
     });
   });
 });

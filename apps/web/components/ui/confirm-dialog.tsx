@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +22,8 @@ interface ConfirmDialogProps {
   /** SRS §35: high-impact/irreversible actions (refund, decision recording) require typing this string. */
   requireTypedConfirmation?: string;
   isConfirming?: boolean;
+  /** Extra content (e.g. a reason field) rendered between the description and the confirmation controls. */
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -33,6 +35,7 @@ export function ConfirmDialog({
   onConfirm,
   requireTypedConfirmation,
   isConfirming = false,
+  children,
 }: ConfirmDialogProps) {
   const [typedValue, setTypedValue] = useState('');
   const typedConfirmationSatisfied = !requireTypedConfirmation || typedValue === requireTypedConfirmation;
@@ -44,6 +47,7 @@ export function ConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
+        {children}
         {requireTypedConfirmation ? (
           <div className="space-y-2">
             <label htmlFor="confirm-typed-value" className="text-sm text-muted-foreground">

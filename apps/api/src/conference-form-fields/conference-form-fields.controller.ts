@@ -16,6 +16,20 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
 import { PERMISSIONS } from '../common/permissions/permissions.catalogue';
 
+@Controller('conferences/:conferenceId/form-fields-for-submission')
+@UseGuards(JwtAuthGuard)
+export class SubmissionFormFieldsController {
+  constructor(
+    private readonly formFieldsService: ConferenceFormFieldsService,
+  ) {}
+
+  /** No org context — an author filling out a submission has no organization membership. */
+  @Get()
+  findActiveForSubmission(@Param('conferenceId') conferenceId: string) {
+    return this.formFieldsService.findActiveForSubmission(conferenceId);
+  }
+}
+
 @Controller('conferences/:conferenceId/form-fields')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ConferenceFormFieldsController {

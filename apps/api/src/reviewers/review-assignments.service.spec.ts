@@ -406,6 +406,65 @@ describe('ReviewAssignmentsService.dashboard', () => {
   });
 });
 
+describe('ReviewAssignmentsService.findReviewsForAbstract', () => {
+  it('rejects a conference outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      buildService(prisma).findReviewsForAbstract(
+        'org-1',
+        'conf-x',
+        'abstract-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('lists every assignment for the abstract with its submitted review, if any', async () => {
+    const assignments = [
+      {
+        id: 'assignment-1',
+        reviewerId: 'reviewer-1',
+        review: { overallScore: 8 },
+      },
+      { id: 'assignment-2', reviewerId: 'reviewer-2', review: null },
+    ];
+    const findMany = jest.fn().mockResolvedValue(assignments);
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
+      reviewAssignment: { findMany },
+    });
+
+    const result = await buildService(prisma).findReviewsForAbstract(
+      'org-1',
+      'conf-1',
+      'abstract-1',
+    );
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { conferenceId: 'conf-1', abstractId: 'abstract-1' },
+      include: { review: true, reviewer: true },
+    });
+    expect(result).toEqual(assignments);
+  });
+});
+
+describe('ReviewAssignmentsService.checkConflict', () => {
+  it('delegates to ConflictOfInterestService.check with the same arguments', async () => {
+    const prisma = fakePrisma();
+    const coiResult = {
+      hasConflict: true,
+      reasons: ['Reviewer is a co-author on this abstract.'],
+    };
+    const service = buildService(prisma, coiResult);
+
+    const result = await service.checkConflict('reviewer-1', 'abstract-1');
+
+    expect(result).toEqual(coiResult);
+  });
+});
+
 describe('ReviewAssignmentsService.markOverdue', () => {
   it('flips PENDING/IN_PROGRESS assignments past their due date to OVERDUE', async () => {
     const updateMany = jest.fn().mockResolvedValue({ count: 3 });

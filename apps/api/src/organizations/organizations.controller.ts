@@ -19,7 +19,10 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../common/decorators/current-user.decorator';
+import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
+import { CurrentEffectivePermissions } from '../common/decorators/current-effective-permissions.decorator';
 import { PERMISSIONS } from '../common/permissions/permissions.catalogue';
+import { assertMatchingOrganizationId } from '../common/utils/assert-matching-organization-id.util';
 
 @Controller('organizations')
 export class OrganizationsController {
@@ -43,15 +46,25 @@ export class OrganizationsController {
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(PERMISSIONS.ORGANIZATION_UPDATE)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
-    return this.organizationsService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @CurrentOrganizationId() organizationId: string,
+    @Body() dto: UpdateOrganizationDto,
+  ) {
+    assertMatchingOrganizationId(id, organizationId);
+    return this.organizationsService.update(organizationId, dto);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(PERMISSIONS.ORGANIZATION_MANAGE_MEMBERS)
   @Post(':id/members')
-  inviteMember(@Param('id') id: string, @Body() dto: InviteMemberDto) {
-    return this.organizationsService.inviteMember(id, dto);
+  inviteMember(
+    @Param('id') id: string,
+    @CurrentOrganizationId() organizationId: string,
+    @Body() dto: InviteMemberDto,
+  ) {
+    assertMatchingOrganizationId(id, organizationId);
+    return this.organizationsService.inviteMember(organizationId, dto);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -60,15 +73,47 @@ export class OrganizationsController {
   updateMembership(
     @Param('id') id: string,
     @Param('membershipId') membershipId: string,
+    @CurrentOrganizationId() organizationId: string,
     @Body() dto: UpdateMembershipDto,
   ) {
-    return this.organizationsService.updateMembership(id, membershipId, dto);
+    assertMatchingOrganizationId(id, organizationId);
+    return this.organizationsService.updateMembership(
+      organizationId,
+      membershipId,
+      dto,
+    );
+  }
+
+  /** Any ACTIVE member can see the roster and their own effective permissions — only mutations are permission-gated. */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Get(':id/members')
+  listMembers(
+    @Param('id') id: string,
+    @CurrentOrganizationId() organizationId: string,
+  ) {
+    assertMatchingOrganizationId(id, organizationId);
+    return this.organizationsService.listMembers(organizationId);
+  }
+
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Get(':id/me/permissions')
+  myPermissions(
+    @Param('id') id: string,
+    @CurrentOrganizationId() organizationId: string,
+    @CurrentEffectivePermissions() effectivePermissions: Set<string>,
+  ) {
+    assertMatchingOrganizationId(id, organizationId);
+    return Array.from(effectivePermissions);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(PERMISSIONS.ORGANIZATION_MANAGE_ROLES)
   @Get(':id/roles')
-  listRoles(@Param('id') id: string) {
-    return this.organizationsService.listRoles(id);
+  listRoles(
+    @Param('id') id: string,
+    @CurrentOrganizationId() organizationId: string,
+  ) {
+    assertMatchingOrganizationId(id, organizationId);
+    return this.organizationsService.listRoles(organizationId);
   }
 }

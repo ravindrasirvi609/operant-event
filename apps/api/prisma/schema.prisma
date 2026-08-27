@@ -261,6 +261,7 @@ model ConferenceSetting {
   registrationEndDate   DateTime?
   paymentEnabled        Boolean    @default(false)
   paymentMode           PaymentMode @default(MANUAL)
+  manualPaymentInstructions String?
   certificateEnabled    Boolean    @default(false)
   checkinEnabled        Boolean    @default(false)
   preventSpeakerOverlap Boolean    @default(false)
@@ -291,16 +292,16 @@ model ConferenceTrack {
 }
 
 model File {
-  id             String       @id @default(cuid())
-  organizationId String
+  id             String        @id @default(cuid())
+  organizationId String?
   fileName       String
   storageKey     String
   mimeType       String
   size           Int
   bucket         String
   uploadedBy     String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime     @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
 
   @@index([organizationId])
   @@map("files")
@@ -705,6 +706,7 @@ model Payment {
   reference         String? // e.g. bank transfer UTR / cheque number, manual mode only
   proofFileId       String? // Files module reference, manual mode only
   decidedBy         String? // staff user id who approved/rejected a manual claim
+  rejectionReason   String? // organizer's free-text reason for a manual claim rejection
   paidAt            DateTime?
   order             Order @relation(fields: [orderId], references: [id])
 

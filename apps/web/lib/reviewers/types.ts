@@ -58,6 +58,20 @@ export interface ReviewerAbstractProjection {
   submittedBy?: string;
 }
 
+export interface ConflictCheckResult {
+  hasConflict: boolean;
+  reasons: string[];
+}
+
+/** `GET conferences/:conferenceId/abstracts/:abstractId/reviews` — every assignment for the abstract with its review, if submitted. */
+export interface AbstractReviewAssignment {
+  id: string;
+  status: ReviewAssignmentStatus;
+  reviewerId: string;
+  reviewer: Reviewer;
+  review: Review | null;
+}
+
 export interface ReviewAssignmentProjection {
   id: string;
   status: ReviewAssignmentStatus;

@@ -57,4 +57,31 @@ describe('ConferenceSettingsService', () => {
       create: { conferenceId: 'conf-1', abstractEnabled: true },
     });
   });
+
+  it('includes manualPaymentInstructions when provided', async () => {
+    const upsert = jest.fn().mockResolvedValue({ conferenceId: 'conf-1' });
+    const prisma = fakePrisma({
+      conference: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'conf-1', organizationId: 'org-1' }),
+      },
+      conferenceSetting: { upsert },
+    });
+
+    await new ConferenceSettingsService(prisma).upsert('org-1', 'conf-1', {
+      manualPaymentInstructions: 'Bank transfer to Acme Bank, A/C 12345.',
+    });
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { conferenceId: 'conf-1' },
+      update: {
+        manualPaymentInstructions: 'Bank transfer to Acme Bank, A/C 12345.',
+      },
+      create: {
+        conferenceId: 'conf-1',
+        manualPaymentInstructions: 'Bank transfer to Acme Bank, A/C 12345.',
+      },
+    });
+  });
 });

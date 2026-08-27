@@ -287,6 +287,32 @@ export class AbstractsService {
     });
   }
 
+  /**
+   * Author-facing read-back: the abstract plus its latest saved
+   * `AbstractVersion.formData` and ordered author list — the only place
+   * an author can see what they last saved, mirroring what `saveVersion`/
+   * `setAuthors` write.
+   */
+  async findOwnedWithDetail(submittedBy: string, abstractId: string) {
+    const abstract = await this.findOwned(submittedBy, abstractId);
+    const [latestVersion, authors] = await Promise.all([
+      this.prisma.abstractVersion.findFirst({
+        where: { abstractId },
+        orderBy: { versionNumber: 'desc' },
+      }),
+      this.prisma.abstractAuthor.findMany({
+        where: { abstractId },
+        orderBy: { authorOrder: 'asc' },
+        include: { author: true },
+      }),
+    ]);
+    return {
+      ...abstract,
+      formData: latestVersion?.formData ?? null,
+      authors,
+    };
+  }
+
   /** Not tenant-scoped by organization — the caller here is the author, not an org member. */
   private async findOwned(submittedBy: string, abstractId: string) {
     const abstract = await this.prisma.abstract.findFirst({

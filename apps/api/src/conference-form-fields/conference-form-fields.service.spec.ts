@@ -111,6 +111,25 @@ describe('ConferenceFormFieldsService.findActive', () => {
   });
 });
 
+describe('ConferenceFormFieldsService.findActiveForSubmission', () => {
+  it('lists only ACTIVE fields, no organization check', async () => {
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'field-1', status: 'ACTIVE' }]);
+    const prisma = fakePrisma({ conferenceFormField: { findMany } });
+
+    const result = await new ConferenceFormFieldsService(
+      prisma,
+    ).findActiveForSubmission('conf-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { conferenceId: 'conf-1', status: 'ACTIVE' },
+      orderBy: { sortOrder: 'asc' },
+    });
+    expect(result).toEqual([{ id: 'field-1', status: 'ACTIVE' }]);
+  });
+});
+
 describe('ConferenceFormFieldsService.update', () => {
   it('never deletes — disabling is a status update, not a removal', async () => {
     const update = jest

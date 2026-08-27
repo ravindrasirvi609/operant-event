@@ -21,7 +21,11 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     },
     abstractVersion: { create: jest.fn(), findFirst: jest.fn() },
     author: { findFirst: jest.fn(), create: jest.fn() },
-    abstractAuthor: { deleteMany: jest.fn(), createMany: jest.fn() },
+    abstractAuthor: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -90,6 +94,79 @@ describe('AbstractsService.createDraft', () => {
         submittedBy: 'user-1',
       },
     });
+  });
+});
+
+describe('AbstractsService.findOwnedWithDetail', () => {
+  it('throws NotFoundException when the abstract is not owned by the caller', async () => {
+    const prisma = fakePrisma({
+      abstract: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      new AbstractsService(prisma, fakeEventEmitter()).findOwnedWithDetail(
+        'user-1',
+        'abstract-x',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns the abstract with its latest version formData and ordered authors', async () => {
+    const abstract = {
+      id: 'abstract-1',
+      submittedBy: 'user-1',
+      title: 'A Study',
+    };
+    const latestVersion = {
+      id: 'version-2',
+      versionNumber: 2,
+      formData: { background: 'x' },
+    };
+    const authors = [
+      { id: 'aa-1', authorOrder: 0, author: { id: 'author-1', name: 'Jane' } },
+    ];
+    const abstractVersionFindFirst = jest.fn().mockResolvedValue(latestVersion);
+    const abstractAuthorFindMany = jest.fn().mockResolvedValue(authors);
+    const prisma = fakePrisma({
+      abstract: { findFirst: jest.fn().mockResolvedValue(abstract) },
+      abstractVersion: { findFirst: abstractVersionFindFirst },
+      abstractAuthor: { findMany: abstractAuthorFindMany },
+    });
+
+    const result = await new AbstractsService(
+      prisma,
+      fakeEventEmitter(),
+    ).findOwnedWithDetail('user-1', 'abstract-1');
+
+    expect(abstractVersionFindFirst).toHaveBeenCalledWith({
+      where: { abstractId: 'abstract-1' },
+      orderBy: { versionNumber: 'desc' },
+    });
+    expect(abstractAuthorFindMany).toHaveBeenCalledWith({
+      where: { abstractId: 'abstract-1' },
+      orderBy: { authorOrder: 'asc' },
+      include: { author: true },
+    });
+    expect(result).toEqual({
+      ...abstract,
+      formData: { background: 'x' },
+      authors,
+    });
+  });
+
+  it('returns formData: null when no version has been saved yet', async () => {
+    const abstract = { id: 'abstract-1', submittedBy: 'user-1' };
+    const prisma = fakePrisma({
+      abstract: { findFirst: jest.fn().mockResolvedValue(abstract) },
+      abstractVersion: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    const result = await new AbstractsService(
+      prisma,
+      fakeEventEmitter(),
+    ).findOwnedWithDetail('user-1', 'abstract-1');
+
+    expect(result.formData).toBeNull();
   });
 });
 

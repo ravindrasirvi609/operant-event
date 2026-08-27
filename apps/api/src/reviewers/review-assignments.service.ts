@@ -316,6 +316,24 @@ export class ReviewAssignmentsService {
     return { assigned, completed, overdue };
   }
 
+  /** Organizer-facing: every assignment for the abstract with its submitted review, if any (null otherwise). */
+  async findReviewsForAbstract(
+    organizationId: string,
+    conferenceId: string,
+    abstractId: string,
+  ) {
+    await this.assertConferenceInOrganization(organizationId, conferenceId);
+    return this.prisma.reviewAssignment.findMany({
+      where: { conferenceId, abstractId },
+      include: { review: true, reviewer: true },
+    });
+  }
+
+  /** Thin pass-through: exposes the already-correct conflict check as a preview, ahead of assignment. */
+  checkConflict(reviewerId: string, abstractId: string) {
+    return this.conflictOfInterest.check(reviewerId, abstractId);
+  }
+
   /**
    * REV-007's job logic. Not yet wired to a scheduler (apps/worker has no
    * BullMQ repeatable-job infra set up) — callable on demand for now;

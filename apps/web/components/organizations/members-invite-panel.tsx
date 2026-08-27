@@ -53,12 +53,6 @@ export function MembersInvitePanel({ organizationId }: { organizationId: string 
 
   return (
     <div className="max-w-md space-y-6">
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
-        There is currently no way to list existing members — the backend has
-        no endpoint for it yet. You can invite new members below; changing an
-        existing member&apos;s role or status isn&apos;t reachable from this
-        UI until that endpoint exists.
-      </div>
       {invited ? (
         <p className="text-sm text-muted-foreground" role="status">
           Invitation sent. The new member will receive an email with a link to set their password.

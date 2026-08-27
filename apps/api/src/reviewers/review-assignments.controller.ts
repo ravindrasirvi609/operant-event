@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  Post,
+} from '@nestjs/common';
 import { ReviewAssignmentsService } from './review-assignments.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { ReassignDto } from './dto/reassign.dto';
@@ -63,6 +71,32 @@ export class ReviewAssignmentsController {
       organizationId,
       conferenceId,
     );
+  }
+
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.ABSTRACT_READ)
+  @Get('conferences/:conferenceId/abstracts/:abstractId/reviews')
+  findReviewsForAbstract(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('conferenceId') conferenceId: string,
+    @Param('abstractId') abstractId: string,
+  ) {
+    return this.reviewAssignmentsService.findReviewsForAbstract(
+      organizationId,
+      conferenceId,
+      abstractId,
+    );
+  }
+
+  /** Preview ahead of assignment — exposes the same check `assign`/`reassign` already enforce. */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.REVIEW_ASSIGNMENT_MANAGE)
+  @Get('conferences/:conferenceId/reviewers/:reviewerId/conflict-check')
+  checkConflict(
+    @Param('reviewerId') reviewerId: string,
+    @Query('abstractId') abstractId: string,
+  ) {
+    return this.reviewAssignmentsService.checkConflict(reviewerId, abstractId);
   }
 
   // Reviewer-facing — the reviewer acts as themselves, no organization context.

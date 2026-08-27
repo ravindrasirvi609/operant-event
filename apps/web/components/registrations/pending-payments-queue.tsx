@@ -5,35 +5,29 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { InvoiceView } from '@/components/registrations/invoice-view';
+import { OrderStatusBadge } from '@/components/registrations/order-status-badge';
 import { RefundButton } from '@/components/registrations/refund-button';
 import { AsyncBoundary } from '@/components/query/async-boundary';
+import { useConferenceOrders } from '@/hooks/use-orders';
 import { useApproveManualPayment, useRejectManualPayment } from '@/hooks/use-payments';
-import { useOrganizerInvoice } from '@/hooks/use-invoices';
 
 type ActionResult = { kind: 'approved' | 'rejected' | 'error'; message: string } | null;
 
-/**
- * There is no backend endpoint that lists orders with an outstanding
- * manual payment claim (`OrdersController`/`PaymentsController` expose
- * only single-order POST actions, never a GET/list) — a real gap, not a
- * client omission. Until a listing endpoint exists, this is a lookup
- * panel: the organizer acts on an order ID the registrant already
- * communicated (e.g. alongside their payment reference), rather than a
- * pre-populated table.
- */
-export function PendingPaymentsQueue() {
-  const [orderId, setOrderId] = useState('');
-  const [rejectOpen, setRejectOpen] = useState(false);
+/** Lists orders for the conference, defaulting to PENDING to surface outstanding manual payment claims. */
+export function PendingPaymentsQueue({ conferenceId }: { conferenceId: string }) {
+  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'ALL'>('PENDING');
+  const ordersQuery = useConferenceOrders(conferenceId, statusFilter === 'PENDING' ? 'PENDING' : undefined);
+  const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [result, setResult] = useState<ActionResult>(null);
   const approve = useApproveManualPayment();
   const reject = useRejectManualPayment();
-  const invoiceQuery = useOrganizerInvoice(orderId);
 
-  async function handleApprove() {
+  async function handleApprove(orderId: string) {
     setResult(null);
     try {
       await approve.mutateAsync(orderId);
+      await ordersQuery.refetch();
       setResult({ kind: 'approved', message: `Order ${orderId} approved.` });
     } catch (error) {
       setResult({ kind: 'error', message: error instanceof Error ? error.message : 'Failed to approve order.' });
@@ -41,51 +35,95 @@ export function PendingPaymentsQueue() {
   }
 
   async function handleReject() {
+    if (!rejectOrderId) {
+      return;
+    }
     setResult(null);
     try {
-      await reject.mutateAsync(orderId);
-      setRejectOpen(false);
-      setResult({ kind: 'rejected', message: `Order ${orderId} rejected.` });
+      await reject.mutateAsync({ orderId: rejectOrderId, reason: rejectReason || undefined });
+      await ordersQuery.refetch();
+      setResult({ kind: 'rejected', message: `Order ${rejectOrderId} rejected.` });
+      setRejectOrderId(null);
+      setRejectReason('');
     } catch (error) {
       setResult({ kind: 'error', message: error instanceof Error ? error.message : 'Failed to reject order.' });
     }
   }
 
   return (
-    <div className="max-w-md space-y-4">
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
-        No endpoint lists orders with pending manual payments yet — act on an order ID the registrant has already
-        given you.
+    <div className="max-w-2xl space-y-4">
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={statusFilter === 'PENDING' ? 'default' : 'outline'}
+          onClick={() => setStatusFilter('PENDING')}
+        >
+          Pending
+        </Button>
+        <Button size="sm" variant={statusFilter === 'ALL' ? 'default' : 'outline'} onClick={() => setStatusFilter('ALL')}>
+          All
+        </Button>
       </div>
-      <FormField label="Order ID" htmlFor="pending-payment-order-id">
-        <Input id="pending-payment-order-id" value={orderId} onChange={(event) => setOrderId(event.target.value)} />
-      </FormField>
       {result ? (
         <p role={result.kind === 'error' ? 'alert' : 'status'} className="text-sm">
           {result.message}
         </p>
       ) : null}
-      <div className="flex gap-2">
-        <Button disabled={!orderId || approve.isPending} onClick={handleApprove}>
-          Approve
-        </Button>
-        <Button variant="outline" disabled={!orderId} onClick={() => setRejectOpen(true)}>
-          Reject
-        </Button>
-        {orderId ? <RefundButton orderId={orderId} /> : null}
-      </div>
+      <AsyncBoundary query={ordersQuery} empty={<p className="text-sm text-muted-foreground">No orders found.</p>}>
+        {(orders) => (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <th className="py-1">Order</th>
+                <th className="py-1">Status</th>
+                <th className="py-1">Total</th>
+                <th className="py-1">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id} className="border-t">
+                  <td className="py-2">{order.orderNumber}</td>
+                  <td className="py-2">
+                    <OrderStatusBadge status={order.status} />
+                  </td>
+                  <td className="py-2">
+                    {order.total} {order.currency}
+                  </td>
+                  <td className="py-2">
+                    <div className="flex gap-2">
+                      {order.status === 'PENDING' ? (
+                        <>
+                          <Button size="sm" disabled={approve.isPending} onClick={() => handleApprove(order.id)}>
+                            Approve
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setRejectOrderId(order.id)}>
+                            Reject
+                          </Button>
+                        </>
+                      ) : null}
+                      {order.status === 'PAID' ? <RefundButton orderId={order.id} onRefunded={() => ordersQuery.refetch()} /> : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </AsyncBoundary>
       <ConfirmDialog
-        open={rejectOpen}
-        onOpenChange={setRejectOpen}
+        open={rejectOrderId !== null}
+        onOpenChange={(open) => !open && setRejectOrderId(null)}
         title="Reject this manual payment claim?"
-        description="The registrant's payment is marked failed. The backend has no field to record a reason today."
+        description="The registrant's payment is marked failed and notified."
         confirmLabel="Reject"
         isConfirming={reject.isPending}
         onConfirm={handleReject}
-      />
-      {orderId ? (
-        <AsyncBoundary query={invoiceQuery}>{(invoice) => <InvoiceView invoice={invoice ?? null} />}</AsyncBoundary>
-      ) : null}
+      >
+        <FormField label="Reason (optional)" htmlFor="reject-reason">
+          <Input id="reject-reason" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
+        </FormField>
+      </ConfirmDialog>
     </div>
   );
 }

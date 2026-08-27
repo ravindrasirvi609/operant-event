@@ -12,8 +12,10 @@ export class ReviewersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async addReviewer(organizationId: string, dto: AddReviewerDto) {
+    const userId = dto.userId ?? (await this.resolveUserIdByEmail(dto.email));
+
     const existing = await this.prisma.reviewer.findUnique({
-      where: { organizationId_userId: { organizationId, userId: dto.userId } },
+      where: { organizationId_userId: { organizationId, userId } },
     });
     if (existing) {
       throw new ConflictException(
@@ -22,8 +24,16 @@ export class ReviewersService {
     }
 
     return this.prisma.reviewer.create({
-      data: { organizationId, userId: dto.userId, status: 'ACTIVE' },
+      data: { organizationId, userId, status: 'ACTIVE' },
     });
+  }
+
+  private async resolveUserIdByEmail(email?: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new NotFoundException(`No user found with email "${email}".`);
+    }
+    return user.id;
   }
 
   async findAll(organizationId: string) {

@@ -181,6 +181,26 @@ export class OrganizationsService {
     });
   }
 
+  /** Any ACTIVE member can see the roster — only mutating membership routes are permission-gated. */
+  async listMembers(organizationId: string) {
+    return this.prisma.organizationMembership.findMany({
+      where: { organizationId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        roles: { include: { role: true } },
+      },
+    });
+  }
+
   async listRoles(organizationId: string) {
     return this.prisma.role.findMany({
       where: { OR: [{ organizationId: null }, { organizationId }] },

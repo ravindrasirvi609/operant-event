@@ -7,8 +7,10 @@ import { PublishConferenceButton } from '@/components/conferences/publish-confer
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useChangeConferenceStatus, useConference, useUpdateConference } from '@/hooks/use-conferences';
+import { useMyPermissions } from '@/hooks/use-organizations';
 import { CONFERENCE_STATUSES, type ConferenceStatus } from '@/lib/conferences/types';
 import { ApiError } from '@/lib/api/backend';
+import { hasPermission, PERMISSIONS } from '@/lib/api/permissions';
 
 function toErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError && error.status === 403) {
@@ -17,17 +19,6 @@ function toErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-/**
- * No endpoint currently exposes "my effective permissions for this
- * organization" to the client (there's no member list, no per-membership
- * roles lookup) — so this page cannot hide edit controls from a caller
- * who genuinely lacks CONFERENCE_UPDATE the way the Definition of Done in
- * docs/plans/frontend/01-...md asks for. Controls are always rendered;
- * the real gate is still the backend's PermissionsGuard on every mutating
- * call, and a 403 from any of them surfaces as a clear message rather
- * than a generic error. This is a known gap, not a silent shortcut —
- * revisit once an effective-permissions endpoint exists.
- */
 export default function ConferenceOverviewPage({ params }: { params: Promise<{ conferenceId: string }> }) {
   const { conferenceId } = use(params);
   const conferenceQuery = useConference(conferenceId);
@@ -35,6 +26,9 @@ export default function ConferenceOverviewPage({ params }: { params: Promise<{ c
   const changeStatus = useChangeConferenceStatus(conferenceId);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const organizationId = conferenceQuery.data?.organizationId ?? '';
+  const permissionsQuery = useMyPermissions(organizationId);
+  const canUpdate = hasPermission(permissionsQuery.data ?? [], PERMISSIONS.CONFERENCE_UPDATE);
 
   async function handleSave(values: ConferenceFormValues) {
     setSaveError(null);
@@ -56,45 +50,53 @@ export default function ConferenceOverviewPage({ params }: { params: Promise<{ c
             <PublishConferenceButton conferenceId={conferenceId} status={conference.status} />
           </div>
 
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Advanced: set status directly</span>
-            <Select
-              value={conference.status}
-              onValueChange={(value) => value && changeStatus.mutate(value as ConferenceStatus)}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CONFERENCE_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {changeStatus.isError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {toErrorMessage(changeStatus.error, 'Failed to change status.')}
-              </p>
-            ) : null}
-          </div>
+          {canUpdate ? (
+            <>
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Advanced: set status directly</span>
+                <Select
+                  value={conference.status}
+                  onValueChange={(value) => value && changeStatus.mutate(value as ConferenceStatus)}
+                >
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONFERENCE_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {changeStatus.isError ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {toErrorMessage(changeStatus.error, 'Failed to change status.')}
+                  </p>
+                ) : null}
+              </div>
 
-          <ConferenceForm
-            defaultValues={conferenceToFormValues(conference)}
-            onSubmit={handleSave}
-            submitLabel="Save changes"
-          />
-          {saved ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Saved.
+              <ConferenceForm
+                defaultValues={conferenceToFormValues(conference)}
+                onSubmit={handleSave}
+                submitLabel="Save changes"
+              />
+              {saved ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Saved.
+                </p>
+              ) : null}
+              {saveError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {saveError}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You don&apos;t have permission to edit this conference.
             </p>
-          ) : null}
-          {saveError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {saveError}
-            </p>
-          ) : null}
+          )}
         </div>
       )}
     </AsyncBoundary>

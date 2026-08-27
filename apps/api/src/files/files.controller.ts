@@ -51,3 +51,45 @@ export class FilesController {
       .then((url) => ({ url }));
   }
 }
+
+/**
+ * Membership-free path: authors, reviewers, and registrants with no
+ * organization membership still need to attach a file. A separate
+ * controller class — not a method-level guard override on
+ * `FilesController` — because NestJS composes class-level and
+ * method-level `@UseGuards` rather than letting a method opt out of a
+ * class-level guard; `PermissionsGuard` (and its mandatory
+ * `X-Organization-Id` header) must never run on these two routes.
+ */
+@Controller('files/self')
+@UseGuards(JwtAuthGuard)
+export class SelfServeFilesController {
+  constructor(private readonly filesService: FilesService) {}
+
+  @Post()
+  @UseInterceptors(FileInterceptor('file'))
+  uploadSelf(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new NotFoundException('No file was included in the request.');
+    }
+    return this.filesService.uploadSelf(user.id, {
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      buffer: file.buffer,
+    });
+  }
+
+  @Get(':id/download-url')
+  getDownloadUrlSelf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.filesService
+      .getDownloadUrlSelf(user.id, id)
+      .then((url) => ({ url }));
+  }
+}

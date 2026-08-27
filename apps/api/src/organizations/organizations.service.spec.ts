@@ -328,6 +328,48 @@ describe('OrganizationsService.updateMembership', () => {
   });
 });
 
+describe('OrganizationsService.listMembers', () => {
+  it('lists memberships with their user (excluding passwordHash) and roles', async () => {
+    const memberships = [
+      {
+        id: 'membership-1',
+        organizationId: 'org-1',
+        userId: 'user-1',
+        status: 'ACTIVE',
+        user: {
+          id: 'user-1',
+          email: 'owner@example.com',
+          firstName: 'Owner',
+          lastName: 'One',
+        },
+        roles: [{ role: { id: 'role-owner', name: 'Organization Owner' } }],
+      },
+    ];
+    const findMany = jest.fn().mockResolvedValue(memberships);
+    const prisma = fakePrisma({ organizationMembership: { findMany } });
+
+    const result = await buildService(prisma).listMembers('org-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org-1' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+            createdAt: true,
+          },
+        },
+        roles: { include: { role: true } },
+      },
+    });
+    expect(result).toEqual(memberships);
+  });
+});
+
 describe('OrganizationsService.listRoles', () => {
   it('lists system roles together with the organization’s own custom roles', async () => {
     const findMany = jest

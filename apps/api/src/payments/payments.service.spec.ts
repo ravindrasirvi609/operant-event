@@ -519,7 +519,49 @@ describe('PaymentsService.rejectManualPayment', () => {
 
     expect(update).toHaveBeenCalledWith({
       where: { id: 'payment-1' },
-      data: { status: 'FAILED', decidedBy: 'staff-1' },
+      data: {
+        status: 'FAILED',
+        decidedBy: 'staff-1',
+        rejectionReason: undefined,
+      },
+    });
+  });
+
+  it('persists an organizer-supplied rejection reason', async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    const prisma = fakePrisma({
+      order: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'order-1', status: 'PENDING' }),
+        update: jest.fn(),
+      },
+      payment: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'payment-1' }),
+        update,
+      },
+    });
+    const service = new PaymentsService(
+      prisma,
+      new Map(),
+      fakeInvoices(),
+      fakeEventEmitter(),
+    );
+
+    await service.rejectManualPayment(
+      'org-1',
+      'order-1',
+      'staff-1',
+      'Proof image was unreadable.',
+    );
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'payment-1' },
+      data: {
+        status: 'FAILED',
+        decidedBy: 'staff-1',
+        rejectionReason: 'Proof image was unreadable.',
+      },
     });
   });
 });

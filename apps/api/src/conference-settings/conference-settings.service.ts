@@ -55,6 +55,9 @@ export class ConferenceSettingsService {
       ...(dto.paymentEnabled !== undefined && {
         paymentEnabled: dto.paymentEnabled,
       }),
+      ...(dto.manualPaymentInstructions !== undefined && {
+        manualPaymentInstructions: dto.manualPaymentInstructions,
+      }),
       ...(dto.certificateEnabled !== undefined && {
         certificateEnabled: dto.certificateEnabled,
       }),

@@ -7,6 +7,24 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
 import { PERMISSIONS } from '../common/permissions/permissions.catalogue';
 
+// Registrant-facing: browse categories/pricing to choose one to register
+// for. No org context — matches RegistrationsController's own
+// registrant-facing routes.
+@UseGuards(JwtAuthGuard)
+@Controller('conferences/:conferenceId/registration-options')
+export class RegistrationOptionsController {
+  constructor(
+    private readonly registrationCategoriesService: RegistrationCategoriesService,
+  ) {}
+
+  @Get()
+  findAllForRegistration(@Param('conferenceId') conferenceId: string) {
+    return this.registrationCategoriesService.findAllForRegistration(
+      conferenceId,
+    );
+  }
+}
+
 // Organizer-facing: registration category setup for a conference.
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions(PERMISSIONS.REGISTRATION_MANAGE)

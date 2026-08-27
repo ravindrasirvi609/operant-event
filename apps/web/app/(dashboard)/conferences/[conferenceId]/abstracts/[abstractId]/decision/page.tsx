@@ -32,7 +32,7 @@ export default function AbstractDecisionPage({
 
             <section className="space-y-3">
               <h2 className="text-sm font-semibold">Record final decision</h2>
-              <DecisionForm abstractId={abstractId} />
+              <DecisionForm conferenceId={conferenceId} abstractId={abstractId} />
             </section>
 
             <section className="space-y-3 border-t pt-6">

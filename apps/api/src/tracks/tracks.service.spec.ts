@@ -60,6 +60,25 @@ describe('TracksService.create', () => {
   });
 });
 
+describe('TracksService.findPublishedForSubmission', () => {
+  it('lists only ACTIVE tracks for the conference, no organization check', async () => {
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'track-1', status: 'ACTIVE' }]);
+    const prisma = fakePrisma({ conferenceTrack: { findMany } });
+
+    const result = await new TracksService(prisma).findPublishedForSubmission(
+      'conf-1',
+    );
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { conferenceId: 'conf-1', status: 'ACTIVE' },
+      orderBy: { sortOrder: 'asc' },
+    });
+    expect(result).toEqual([{ id: 'track-1', status: 'ACTIVE' }]);
+  });
+});
+
 describe('TracksService.reorder', () => {
   it('sets sortOrder to match the given order when the id set matches exactly', async () => {
     const update = jest.fn().mockResolvedValue(undefined);

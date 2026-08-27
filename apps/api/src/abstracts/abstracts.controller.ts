@@ -45,6 +45,15 @@ export class AbstractsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('abstracts/:id')
+  findOwned(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') abstractId: string,
+  ) {
+    return this.abstractsService.findOwnedWithDetail(user.id, abstractId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Put('abstracts/:id/versions')
   saveVersion(
     @CurrentUser() user: AuthenticatedUser,

@@ -11,6 +11,7 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
       create: jest.fn(),
     },
     reviewerProfile: { upsert: jest.fn() },
+    user: { findUnique: jest.fn() },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -46,6 +47,38 @@ describe('ReviewersService.addReviewer', () => {
     expect(create).toHaveBeenCalledWith({
       data: { organizationId: 'org-1', userId: 'user-1', status: 'ACTIVE' },
     });
+  });
+
+  it('resolves the user by email when userId is not given', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'reviewer-1' });
+    const prisma = fakePrisma({
+      reviewer: { findUnique: jest.fn().mockResolvedValue(null), create },
+      user: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'user-2', email: 'reviewer@example.com' }),
+      },
+    });
+
+    await new ReviewersService(prisma).addReviewer('org-1', {
+      email: 'reviewer@example.com',
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: { organizationId: 'org-1', userId: 'user-2', status: 'ACTIVE' },
+    });
+  });
+
+  it('throws NotFoundException when the given email matches no user', async () => {
+    const prisma = fakePrisma({
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      new ReviewersService(prisma).addReviewer('org-1', {
+        email: 'nobody@example.com',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 

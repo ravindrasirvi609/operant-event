@@ -174,6 +174,7 @@ export class PaymentsService {
     organizationId: string,
     orderId: string,
     decidedBy: string,
+    reason?: string,
   ) {
     await this.assertOrderInOrganization(organizationId, orderId);
 
@@ -188,7 +189,7 @@ export class PaymentsService {
 
     return this.prisma.payment.update({
       where: { id: pendingClaim.id },
-      data: { status: 'FAILED', decidedBy },
+      data: { status: 'FAILED', decidedBy, rejectionReason: reason },
     });
   }
 

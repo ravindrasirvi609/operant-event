@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/client';
-import type { DashboardCounts } from '@/lib/reviewers/types';
+import type { AbstractReviewAssignment, ConflictCheckResult, DashboardCounts } from '@/lib/reviewers/types';
 
 function dashboardQueryKey(conferenceId: string) {
   return ['conferences', conferenceId, 'review-assignments', 'dashboard'];
@@ -28,12 +28,18 @@ export interface AssignReviewInput {
   dueDate?: string;
 }
 
-/**
- * There is no endpoint to pre-flight-check a conflict of interest before
- * assigning — `ConflictOfInterestService.check()` only ever runs inside
- * this call, throwing a 409 on a real conflict. There is no separate
- * "preview" route to surface a warning before submitting.
- */
+/** Preview ahead of assignment — the same check `assign` enforces server-side, surfaced early as a warning. */
+export function useConflictCheck(conferenceId: string, reviewerId: string, abstractId: string) {
+  return useQuery({
+    queryKey: ['conferences', conferenceId, 'reviewers', reviewerId, 'conflict-check', abstractId],
+    queryFn: () =>
+      apiGet<ConflictCheckResult>(
+        `conferences/${conferenceId}/reviewers/${reviewerId}/conflict-check?abstractId=${abstractId}`,
+      ),
+    enabled: Boolean(reviewerId) && Boolean(abstractId),
+  });
+}
+
 export function useAssignReview(conferenceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -42,6 +48,16 @@ export function useAssignReview(conferenceId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: dashboardQueryKey(conferenceId) });
     },
+  });
+}
+
+/** Every assignment for the abstract with its submitted review, if any — for organizer/chair context ahead of a decision. */
+export function useAbstractReviews(conferenceId: string, abstractId: string) {
+  return useQuery({
+    queryKey: ['conferences', conferenceId, 'abstracts', abstractId, 'reviews'],
+    queryFn: () =>
+      apiGet<AbstractReviewAssignment[]>(`conferences/${conferenceId}/abstracts/${abstractId}/reviews`),
+    enabled: Boolean(conferenceId) && Boolean(abstractId),
   });
 }
 

@@ -1,8 +1,12 @@
 /**
- * `ConferenceSetting` has no free-text instructions field yet (checked:
- * only `paymentMode`, no `manualPaymentInstructions: String?`) — this
- * renders whatever text is passed in, defaulting to a generic fallback,
- * so wiring a real field later is a one-line change at the call site.
+ * `ConferenceSetting.manualPaymentInstructions` now exists and is
+ * settable by organizers (see `<ConferenceSettingsForm>`), but `GET
+ * conferences/:conferenceId/settings` still requires an active
+ * organization membership — a registrant filling out checkout has none,
+ * so there is still no way to fetch the real text from this no-org-context
+ * flow. This renders whatever text is passed in, defaulting to a generic
+ * fallback, so wiring the real value through is a one-line change at the
+ * call site once a no-org-context read exists.
  */
 export function ManualPaymentInstructions({ instructions }: { instructions?: string }) {
   return (

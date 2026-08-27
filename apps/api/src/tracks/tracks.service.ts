@@ -39,6 +39,17 @@ export class TracksService {
     });
   }
 
+  /**
+   * No organization check: authors filling out a submission have no org
+   * context, matching AbstractsController's own author-facing routes.
+   */
+  async findPublishedForSubmission(conferenceId: string) {
+    return this.prisma.conferenceTrack.findMany({
+      where: { conferenceId, status: 'ACTIVE' },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
   async update(
     organizationId: string,
     conferenceId: string,

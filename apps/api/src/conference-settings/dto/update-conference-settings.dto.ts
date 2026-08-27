@@ -1,4 +1,10 @@
-import { IsBoolean, IsDateString, IsIn, IsOptional } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateConferenceSettingsDto {
   @IsOptional()
@@ -36,6 +42,10 @@ export class UpdateConferenceSettingsDto {
   @IsOptional()
   @IsBoolean()
   paymentEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  manualPaymentInstructions?: string;
 
   @IsOptional()
   @IsBoolean()

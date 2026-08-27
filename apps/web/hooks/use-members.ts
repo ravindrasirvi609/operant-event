@@ -1,7 +1,16 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
-import { apiPost } from '@/lib/api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '@/lib/api/client';
+import type { OrganizationMember } from '@/lib/organizations/types';
+
+export function useMembers(organizationId: string) {
+  return useQuery({
+    queryKey: ['organizations', organizationId, 'members'],
+    queryFn: () => apiGet<OrganizationMember[]>(`organizations/${organizationId}/members`),
+    enabled: Boolean(organizationId),
+  });
+}
 
 export interface InviteMemberInput {
   email: string;
@@ -10,15 +19,12 @@ export interface InviteMemberInput {
   roleIds: string[];
 }
 
-/**
- * Invite-only: there is no `GET organizations/:id/members` endpoint, so a
- * member list/roster page cannot be built against real data yet — see
- * docs/plans/frontend/01-auth-organization-rbac-conference.md's
- * Definition of Done note. `<MembersInvitePanel>` discloses this gap
- * directly in the UI rather than showing a fake or empty list.
- */
 export function useInviteMember(organizationId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: InviteMemberInput) => apiPost(`organizations/${organizationId}/members`, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['organizations', organizationId, 'members'] });
+    },
   });
 }

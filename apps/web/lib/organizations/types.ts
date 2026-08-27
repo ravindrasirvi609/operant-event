@@ -8,7 +8,7 @@ export interface Organization {
   logoFileId: string | null;
 }
 
-export const MEMBERSHIP_STATUSES = ['ACTIVE', 'DEACTIVATED'] as const;
+export const MEMBERSHIP_STATUSES = ['INVITED', 'ACTIVE', 'DEACTIVATED'] as const;
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
 
 export interface Role {
@@ -17,6 +17,24 @@ export interface Role {
   name: string;
   description: string | null;
   isSystem: boolean;
+}
+
+export interface OrganizationMember {
+  id: string;
+  organizationId: string;
+  userId: string;
+  status: MembershipStatus;
+  invitedAt: string;
+  joinedAt: string | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    status: string;
+    createdAt: string;
+  };
+  roles: { role: Role }[];
 }
 
 export interface AuthSession {

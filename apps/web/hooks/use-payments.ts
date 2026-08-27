@@ -38,7 +38,8 @@ export function useApproveManualPayment() {
  */
 export function useRejectManualPayment() {
   return useMutation({
-    mutationFn: (orderId: string) => apiPost<Payment>(`orders/${orderId}/reject-payment`),
+    mutationFn: ({ orderId, reason }: { orderId: string; reason?: string }) =>
+      apiPost<Payment>(`orders/${orderId}/reject-payment`, reason ? { reason } : undefined),
   });
 }
 

@@ -11,6 +11,7 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { PaymentsService } from './payments.service';
 import { SubmitManualPaymentProofDto } from './dto/submit-manual-payment-proof.dto';
+import { RejectManualPaymentDto } from './dto/reject-manual-payment.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -79,11 +80,13 @@ export class PaymentsController {
     @CurrentOrganizationId() organizationId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Param('orderId') orderId: string,
+    @Body() dto: RejectManualPaymentDto,
   ) {
     return this.paymentsService.rejectManualPayment(
       organizationId,
       orderId,
       user.id,
+      dto.reason,
     );
   }
 

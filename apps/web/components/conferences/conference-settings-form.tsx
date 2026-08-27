@@ -26,6 +26,7 @@ const settingsSchema = z.object({
   registrationStartDate: z.string().optional(),
   registrationEndDate: z.string().optional(),
   paymentEnabled: z.boolean(),
+  manualPaymentInstructions: z.string().optional(),
   certificateEnabled: z.boolean(),
   checkinEnabled: z.boolean(),
 });
@@ -43,6 +44,7 @@ function toFormValues(settings: ConferenceSetting): SettingsValues {
     registrationStartDate: settings.registrationStartDate?.slice(0, 10) ?? '',
     registrationEndDate: settings.registrationEndDate?.slice(0, 10) ?? '',
     paymentEnabled: settings.paymentEnabled,
+    manualPaymentInstructions: settings.manualPaymentInstructions ?? '',
     certificateEnabled: settings.certificateEnabled,
     checkinEnabled: settings.checkinEnabled,
   };
@@ -127,6 +129,14 @@ export function ConferenceSettingsForm({ conferenceId, settings }: { conferenceI
           <input id="payment-enabled" type="checkbox" className="size-4 rounded border-input" {...register('paymentEnabled')} />
           Payment enabled
         </label>
+        <FormField label="Manual payment instructions (shown to registrants in MANUAL mode)" htmlFor="manual-payment-instructions">
+          <textarea
+            id="manual-payment-instructions"
+            className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm"
+            rows={3}
+            {...register('manualPaymentInstructions')}
+          />
+        </FormField>
       </section>
 
       <section className="space-y-3 rounded-lg border p-4">

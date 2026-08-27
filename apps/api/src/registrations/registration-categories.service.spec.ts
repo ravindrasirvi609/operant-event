@@ -53,6 +53,23 @@ describe('RegistrationCategoriesService.create', () => {
   });
 });
 
+describe('RegistrationCategoriesService.findAllForRegistration', () => {
+  it('lists categories with their pricing types, no organization check', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: 'cat-1', types: [] }]);
+    const prisma = fakePrisma({ registrationCategory: { findMany } });
+
+    const result = await new RegistrationCategoriesService(
+      prisma,
+    ).findAllForRegistration('conf-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { conferenceId: 'conf-1' },
+      include: { types: true },
+    });
+    expect(result).toEqual([{ id: 'cat-1', types: [] }]);
+  });
+});
+
 describe('RegistrationCategoriesService.findAll', () => {
   it('lists categories with their pricing types', async () => {
     const findMany = jest.fn().mockResolvedValue([]);

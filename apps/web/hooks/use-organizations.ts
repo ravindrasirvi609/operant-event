@@ -29,6 +29,14 @@ export function useOrganization(organizationId: string) {
   });
 }
 
+export function useMyPermissions(organizationId: string) {
+  return useQuery({
+    queryKey: ['organizations', organizationId, 'me', 'permissions'],
+    queryFn: () => apiGet<string[]>(`organizations/${organizationId}/me/permissions`),
+    enabled: Boolean(organizationId),
+  });
+}
+
 export interface UpdateOrganizationInput {
   name?: string;
   contactEmail?: string;

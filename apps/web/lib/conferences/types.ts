@@ -53,6 +53,7 @@ export interface ConferenceSetting {
    * that.
    */
   paymentMode: PaymentMode;
+  manualPaymentInstructions: string | null;
   certificateEnabled: boolean;
   checkinEnabled: boolean;
 }

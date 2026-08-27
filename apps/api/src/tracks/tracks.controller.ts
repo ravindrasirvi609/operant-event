@@ -18,6 +18,18 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
 import { PERMISSIONS } from '../common/permissions/permissions.catalogue';
 
+@Controller('conferences/:conferenceId/tracks-for-submission')
+@UseGuards(JwtAuthGuard)
+export class SubmissionTracksController {
+  constructor(private readonly tracksService: TracksService) {}
+
+  /** No org context — an author filling out a submission has no organization membership. */
+  @Get()
+  findPublishedForSubmission(@Param('conferenceId') conferenceId: string) {
+    return this.tracksService.findPublishedForSubmission(conferenceId);
+  }
+}
+
 @Controller('conferences/:conferenceId/tracks')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class TracksController {

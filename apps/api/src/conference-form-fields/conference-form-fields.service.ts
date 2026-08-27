@@ -57,6 +57,17 @@ export class ConferenceFormFieldsService {
     });
   }
 
+  /**
+   * No organization check: authors filling out a submission have no org
+   * context, matching AbstractsController's own author-facing routes.
+   */
+  async findActiveForSubmission(conferenceId: string) {
+    return this.prisma.conferenceFormField.findMany({
+      where: { conferenceId, status: 'ACTIVE' },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
   /** Disabling is a status flip, never a delete — historical AbstractVersion.formData must stay interpretable. */
   async update(
     organizationId: string,

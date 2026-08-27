@@ -78,6 +78,16 @@ describe('ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: 'Refund' })).toBeDisabled();
   });
 
+  it('renders optional children between the description and the confirmation controls', () => {
+    render(
+      <ConfirmDialog open onOpenChange={() => {}} title="Reject this claim?" onConfirm={() => {}}>
+        <p>Extra reason field goes here.</p>
+      </ConfirmDialog>,
+    );
+
+    expect(screen.getByText('Extra reason field goes here.')).toBeInTheDocument();
+  });
+
   it('renders nothing when open is false', () => {
     render(
       <ConfirmDialog open={false} onOpenChange={() => {}} title="Withdraw abstract?" onConfirm={() => {}} />,

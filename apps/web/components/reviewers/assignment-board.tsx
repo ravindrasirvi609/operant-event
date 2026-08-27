@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ReviewDashboardCounts } from '@/components/reviewers/review-dashboard-counts';
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { useOrganizerAbstracts } from '@/hooks/use-organizer-abstracts';
-import { useAssignReview, useReviewDashboard } from '@/hooks/use-review-assignments';
+import { useAssignReview, useConflictCheck, useReviewDashboard } from '@/hooks/use-review-assignments';
 import { useReviewers } from '@/hooks/use-reviewers';
 
 const assignSchema = z.object({
@@ -21,13 +21,6 @@ const assignSchema = z.object({
 
 type AssignValues = z.infer<typeof assignSchema>;
 
-/**
- * There is no endpoint to preview a conflict-of-interest check before
- * assigning — `ConflictOfInterestService.check()` only ever runs inside
- * the real assign call, which throws a 409 with the exact reason(s) on a
- * real conflict. That 409 message is shown as-is below; there is no
- * earlier warning to surface.
- */
 export function AssignmentBoard({ organizationId, conferenceId }: { organizationId: string; conferenceId: string }) {
   const dashboardQuery = useReviewDashboard(conferenceId);
   const abstractsQuery = useOrganizerAbstracts(conferenceId);
@@ -38,9 +31,13 @@ export function AssignmentBoard({ organizationId, conferenceId }: { organization
   const {
     register,
     handleSubmit,
+    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<AssignValues>({ resolver: zodResolver(assignSchema) });
+  const selectedAbstractId = watch('abstractId');
+  const selectedReviewerId = watch('reviewerId');
+  const conflictQuery = useConflictCheck(conferenceId, selectedReviewerId, selectedAbstractId);
 
   async function onSubmit(values: AssignValues) {
     setAssignError(null);
@@ -91,6 +88,11 @@ export function AssignmentBoard({ organizationId, conferenceId }: { organization
         <FormField label="Due date (optional)" htmlFor="assign-due-date">
           <Input id="assign-due-date" type="date" {...register('dueDate')} />
         </FormField>
+        {conflictQuery.data?.hasConflict ? (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400">
+            Conflict of interest: {conflictQuery.data.reasons.join(' ')}
+          </p>
+        ) : null}
         {assignError ? (
           <p role="alert" className="text-sm text-destructive">
             {assignError}

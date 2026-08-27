@@ -43,20 +43,10 @@ interface AbstractWizardProps {
 }
 
 /**
- * `GET conferences/:conferenceId/tracks` and `GET
- * conferences/:conferenceId/form-fields` both require `PermissionsGuard`
- * (an active organization membership) — an author with no organization
- * membership at all cannot reach either one, even though
- * `AbstractsController`'s own author routes are explicitly built to need
- * no org context. Both fetches below are attempted and degrade
- * gracefully (no track picker / no custom-fields step) rather than
- * blocking the whole flow — but for a conference with **required**
- * active custom fields, the backend's own submit-time validation
- * (running server-side, independent of what the client could read) will
- * still reject the submission. That half of the gap has no frontend
- * workaround; it needs a backend fix (a public or `JwtAuthGuard`-only
- * read variant of both endpoints, matching the pattern the author routes
- * already use).
+ * Uses the `JwtAuthGuard`-only `.../tracks-for-submission` and
+ * `.../form-fields-for-submission` routes — not the organizer-facing
+ * `.../tracks`/`.../form-fields` routes, which require an active
+ * organization membership an author doesn't have.
  */
 export function AbstractWizard({ conferenceId, existingAbstractId, existingBasics }: AbstractWizardProps) {
   const router = useRouter();
@@ -68,14 +58,12 @@ export function AbstractWizard({ conferenceId, existingAbstractId, existingBasic
   const [stepError, setStepError] = useState<string | null>(null);
 
   const tracksQuery = useQuery({
-    queryKey: ['conferences', conferenceId, 'tracks', 'wizard'],
-    queryFn: () => apiGet<ConferenceTrack[]>(`conferences/${conferenceId}/tracks`),
-    retry: false,
+    queryKey: ['conferences', conferenceId, 'tracks-for-submission'],
+    queryFn: () => apiGet<ConferenceTrack[]>(`conferences/${conferenceId}/tracks-for-submission`),
   });
   const formFieldsQuery = useQuery({
-    queryKey: ['conferences', conferenceId, 'form-fields', 'wizard'],
-    queryFn: () => apiGet<ConferenceFormField[]>(`conferences/${conferenceId}/form-fields`),
-    retry: false,
+    queryKey: ['conferences', conferenceId, 'form-fields-for-submission'],
+    queryFn: () => apiGet<ConferenceFormField[]>(`conferences/${conferenceId}/form-fields-for-submission`),
   });
   const tracksAvailable = tracksQuery.isSuccess;
   const activeFields = (formFieldsQuery.data ?? []).filter((field) => field.status === 'ACTIVE');
