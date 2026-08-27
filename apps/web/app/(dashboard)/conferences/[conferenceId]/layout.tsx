@@ -15,6 +15,8 @@ const TABS = [
   { href: '/abstracts', label: 'Abstracts' },
   { href: '/reviewers', label: 'Reviewers' },
   { href: '/review-assignments', label: 'Review assignments' },
+  { href: '/registration-categories', label: 'Registration' },
+  { href: '/payments', label: 'Payments' },
 ];
 
 export default function ConferenceLayout({

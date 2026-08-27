@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS: Omit<ConferenceSetting, 'conferenceId'> = {
   registrationStartDate: null,
   registrationEndDate: null,
   paymentEnabled: false,
+  paymentMode: 'MANUAL',
   certificateEnabled: false,
   checkinEnabled: false,
 };

@@ -31,6 +31,9 @@ export interface Conference {
 export const REVIEW_MODES = ['SINGLE_BLIND', 'DOUBLE_BLIND', 'OPEN'] as const;
 export type ReviewMode = (typeof REVIEW_MODES)[number];
 
+export const PAYMENT_MODES = ['GATEWAY', 'MANUAL'] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
 export interface ConferenceSetting {
   conferenceId: string;
   abstractEnabled: boolean;
@@ -42,6 +45,14 @@ export interface ConferenceSetting {
   registrationStartDate: string | null;
   registrationEndDate: string | null;
   paymentEnabled: boolean;
+  /**
+   * Read-only here: `UpdateConferenceSettingsDto` has no `paymentMode`
+   * field, so there is no UI path to change it — only to display it.
+   * `OrdersService.create`'s response shape is still the sole source of
+   * truth for which branch actually ran; never use this field to decide
+   * that.
+   */
+  paymentMode: PaymentMode;
   certificateEnabled: boolean;
   checkinEnabled: boolean;
 }

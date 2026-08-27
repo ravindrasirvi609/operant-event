@@ -38,6 +38,12 @@ describe('parseApiResponse', () => {
     await expect(parseApiResponse(response)).rejects.toBeInstanceOf(ApiError);
   });
 
+  it('returns undefined for a 201 response with an empty body (Nest void-returning controller methods)', async () => {
+    const response = new Response('', { status: 201 });
+
+    await expect(parseApiResponse(response)).resolves.toBeUndefined();
+  });
+
   it('falls back to the response statusText when the error body is not valid JSON', async () => {
     const response = new Response('not json', { status: 500, statusText: 'Internal Server Error' });
 
