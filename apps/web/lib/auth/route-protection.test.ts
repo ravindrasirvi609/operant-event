@@ -29,6 +29,19 @@ describe('decideRouteAccess', () => {
     expect(decideRouteAccess('/conferences/conf-1', false)).toEqual({ action: 'redirect', to: '/login' });
   });
 
+  it('allows the public verification page regardless of session state', () => {
+    expect(decideRouteAccess('/verify/ABC123', false)).toEqual({ action: 'next' });
+    expect(decideRouteAccess('/verify/ABC123', true)).toEqual({ action: 'next' });
+  });
+
+  it('allows the public program view page regardless of session state, without opening the rest of /conferences', () => {
+    expect(decideRouteAccess('/conferences/conf-1/program/view', false)).toEqual({ action: 'next' });
+    expect(decideRouteAccess('/conferences/conf-1/program/view', true)).toEqual({ action: 'next' });
+    // The organizer's own /program page (no /view suffix) must stay protected.
+    expect(decideRouteAccess('/conferences/conf-1/program', false)).toEqual({ action: 'redirect', to: '/login' });
+    expect(decideRouteAccess('/conferences/conf-1/settings', false)).toEqual({ action: 'redirect', to: '/login' });
+  });
+
   it('allows an authenticated user to reach a protected route', () => {
     expect(decideRouteAccess('/', true)).toEqual({ action: 'next' });
   });
