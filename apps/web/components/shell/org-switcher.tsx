@@ -12,6 +12,8 @@ export function OrgSwitcher() {
     return null;
   }
 
+  const activeOrganization = organizations.find((organization) => organization.id === activeOrgId);
+
   return (
     <Select
       value={activeOrgId ?? undefined}
@@ -22,7 +24,7 @@ export function OrgSwitcher() {
       }}
     >
       <SelectTrigger aria-label="Active organization" className="w-48">
-        <SelectValue placeholder="Select organization" />
+        <SelectValue placeholder="Select organization">{activeOrganization?.name}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {organizations.map((organization) => (
