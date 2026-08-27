@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { OrderStatus } from '@prisma/client';
+import type { OrderStatus } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { formatSequenceNumber } from '../common/utils/sequence-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';

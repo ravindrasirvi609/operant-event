@@ -49,4 +49,15 @@ export class ExportsController {
   ) {
     return this.exportsService.findById(organizationId, exportJobId);
   }
+
+  @Get('conferences/:conferenceId/exports')
+  findAllForConference(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('conferenceId') conferenceId: string,
+  ) {
+    return this.exportsService.findAllForConference(
+      organizationId,
+      conferenceId,
+    );
+  }
 }

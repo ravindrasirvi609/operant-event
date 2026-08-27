@@ -3,6 +3,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "target": "ES2023",
+    "isolatedModules": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "esModuleInterop": true,

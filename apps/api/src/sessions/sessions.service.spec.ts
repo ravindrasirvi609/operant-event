@@ -402,6 +402,50 @@ describe('SessionsService.findAllPublished', () => {
   });
 });
 
+describe('SessionsService.findOneForOrganizer', () => {
+  it('throws NotFoundException when the session is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      programSession: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+        update: jest.fn(),
+        findMany: jest.fn(),
+      },
+    });
+    const service = new SessionsService(prisma, fakeConflictService());
+
+    await expect(
+      service.findOneForOrganizer('org-1', 'session-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns the session with its track, speakers, and presentations included', async () => {
+    const session = { id: 'session-1', title: 'Opening Keynote' };
+    const findFirst = jest.fn().mockResolvedValue(session);
+    const prisma = fakePrisma({
+      programSession: {
+        findFirst,
+        create: jest.fn(),
+        update: jest.fn(),
+        findMany: jest.fn(),
+      },
+    });
+    const service = new SessionsService(prisma, fakeConflictService());
+
+    const result = await service.findOneForOrganizer('org-1', 'session-1');
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'session-1', conference: { organizationId: 'org-1' } },
+      include: {
+        track: true,
+        speakers: { include: { speaker: true } },
+        presentations: true,
+      },
+    });
+    expect(result).toEqual(session);
+  });
+});
+
 describe('SessionsService.findAllForOrganizer', () => {
   it('throws NotFoundException when the conference is outside the caller organization', async () => {
     const prisma = fakePrisma({

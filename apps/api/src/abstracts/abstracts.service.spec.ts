@@ -426,6 +426,8 @@ describe('AbstractsService.submit', () => {
       conferenceId: 'conf-1',
       userId: 'user-1',
       templateData: { abstractTitle: 'My Paper' },
+      entityType: 'abstract',
+      entityId: 'abs-1',
     });
   });
 
@@ -632,6 +634,8 @@ describe('AbstractsService.submit', () => {
       conferenceId: 'conf-1',
       userId: 'user-1',
       templateData: { abstractTitle: 'My Paper' },
+      entityType: 'abstract',
+      entityId: 'abs-1',
     });
   });
 

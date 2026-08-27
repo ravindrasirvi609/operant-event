@@ -56,6 +56,43 @@ describe('NotificationsService.notify', () => {
       },
     });
   });
+
+  it('records the structured entity reference when provided', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'notif-1' });
+    const prisma = fakePrisma({
+      notification: {
+        create,
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    const service = new NotificationsService(prisma);
+
+    await service.notify(
+      'org-1',
+      'user-1',
+      'certificate.issued',
+      'Certificate issued',
+      'Your certificate is ready.',
+      { certificateNumber: 'CERT-000001' },
+      'certificate',
+      'cert-1',
+    );
+
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        organizationId: 'org-1',
+        userId: 'user-1',
+        type: 'certificate.issued',
+        title: 'Certificate issued',
+        message: 'Your certificate is ready.',
+        data: { certificateNumber: 'CERT-000001' },
+        entityType: 'certificate',
+        entityId: 'cert-1',
+      },
+    });
+  });
 });
 
 describe('NotificationsService.findMine', () => {

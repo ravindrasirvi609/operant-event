@@ -3,31 +3,22 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AsyncBoundary } from '@/components/query/async-boundary';
 import { JobStatusPoller } from '@/components/jobs/job-status-poller';
-import { useCreateExport, useExportJob } from '@/hooks/use-exports';
-import { addJobToHistory } from '@/lib/jobs/job-history-cache';
-import { useJobHistory } from '@/lib/jobs/use-job-history';
+import { useCreateExport, useExportHistory, useExportJob } from '@/hooks/use-exports';
 import { EXPORT_TYPES, type ExportType } from '@/lib/jobs/types';
 
-/**
- * "History" below is session-local only — there is no `GET
- * conferences/:conferenceId/exports` list endpoint, so a different
- * tab/device/session sees nothing here even though the jobs still
- * exist server-side.
- */
+/** Export history is the real `GET conferences/:conferenceId/exports` list — visible across tabs/devices/sessions, not a session-local cache. */
 export function ExportRequestForm({ conferenceId }: { conferenceId: string }) {
   const [type, setType] = useState<ExportType>('ABSTRACTS');
   const createExport = useCreateExport(conferenceId);
+  const historyQuery = useExportHistory(conferenceId);
   const [error, setError] = useState<string | null>(null);
-  const history = useJobHistory('exports', conferenceId);
-  const [localHistory, setLocalHistory] = useState<string[]>(history);
 
   async function handleCreate() {
     setError(null);
     try {
-      const job = await createExport.mutateAsync(type);
-      addJobToHistory('exports', conferenceId, job.id);
-      setLocalHistory((current) => [job.id, ...current]);
+      await createExport.mutateAsync(type);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create export.');
     }
@@ -58,24 +49,24 @@ export function ExportRequestForm({ conferenceId }: { conferenceId: string }) {
         </p>
       ) : null}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold">This session&apos;s requests</h2>
-        {localHistory.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No exports requested yet this session.</p>
-        ) : (
-          <ul className="space-y-3">
-            {localHistory.map((jobId) => (
-              <li key={jobId} className="rounded-lg border p-3">
-                <ExportJobRow exportId={jobId} />
-              </li>
-            ))}
-          </ul>
-        )}
+        <h2 className="text-sm font-semibold">Export history</h2>
+        <AsyncBoundary query={historyQuery} empty={<p className="text-sm text-muted-foreground">No exports requested yet.</p>}>
+          {(jobs) => (
+            <ul className="space-y-3">
+              {jobs.map((job) => (
+                <li key={job.id} className="rounded-lg border p-3">
+                  <ExportJobRow exportId={job.id} type={job.type} createdAt={job.createdAt} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </AsyncBoundary>
       </div>
     </div>
   );
 }
 
-function ExportJobRow({ exportId }: { exportId: string }) {
+function ExportJobRow({ exportId, type, createdAt }: { exportId: string; type: string; createdAt: string }) {
   const job = useExportJob(exportId);
   if (!job.data) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -83,7 +74,7 @@ function ExportJobRow({ exportId }: { exportId: string }) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">
-        {job.data.type} · {exportId}
+        {type} · {new Date(createdAt).toLocaleString()}
       </p>
       <JobStatusPoller
         status={job.data.status}

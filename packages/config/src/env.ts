@@ -17,6 +17,20 @@ const envSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Shared by apps/api and apps/worker — both must resolve the same
+  // absolute (or identically-relative-from-a-shared-cwd) directory,
+  // since a generated file written by one process is read back by the
+  // other (e.g. an import's source file, an export's result file).
+  UPLOADS_DIR: z.string().default('./uploads'),
+  // Optional: shared by apps/api (auth verification/reset emails, via
+  // ResendAuthMailer) and apps/worker (queued notification emails). Absent
+  // in either process, that process's mailer falls back to a console-log
+  // stopgap instead of sending.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM_ADDRESS: z.string().optional(),
+  // apps/api only: base URL used to build links in auth emails
+  // (verify-email, password-reset/confirm) that point at apps/web.
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

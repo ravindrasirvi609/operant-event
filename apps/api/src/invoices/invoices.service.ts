@@ -4,27 +4,44 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Order } from '@prisma/client';
+import type { Invoice, Order, Prisma } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { FilesService } from '../files/files.service';
 import { formatSequenceNumber } from '../common/utils/sequence-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
+import { renderInvoicePdf } from '../common/pdf/pdf-renderer.util';
 
 const MAX_NUMBER_ATTEMPTS = 5;
 
+type OrderForInvoice = Prisma.OrderGetPayload<{
+  include: {
+    conference: true;
+    registration: { include: { user: true } };
+    items: true;
+  };
+}>;
+
 @Injectable()
 export class InvoicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly filesService: FilesService,
+  ) {}
 
   /**
    * PAY-005. Idempotent: calling this again for the same order returns the
-   * already-issued invoice rather than creating a second one. Actual PDF
-   * rendering (Invoice.documentFileId) is deferred — needs a PDF library
-   * plus the same apps/worker job wiring already deferred elsewhere in
-   * this codebase; the invoice record itself (numbers, totals) is real.
+   * already-issued invoice rather than creating a second one. On first
+   * creation, also renders and uploads the invoice PDF and sets
+   * `Invoice.documentFileId`.
    */
   async generateForOrder(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
+      include: {
+        conference: true,
+        registration: { include: { user: true } },
+        items: true,
+      },
     });
     if (!order) {
       throw new NotFoundException('Order not found.');
@@ -40,7 +57,46 @@ export class InvoicesService {
       return existing;
     }
 
-    return this.createInvoiceWithRetry(order);
+    const invoice = await this.createInvoiceWithRetry(order);
+    return this.attachDocument(order, invoice);
+  }
+
+  private async attachDocument(order: OrderForInvoice, invoice: Invoice) {
+    const buffer = await renderInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      orderNumber: order.orderNumber,
+      issuedAt: invoice.issuedAt,
+      conferenceName: order.conference.name,
+      billedToName: `${order.registration.user.firstName} ${order.registration.user.lastName}`,
+      billedToEmail: order.registration.user.email,
+      items: order.items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+        totalPrice: item.totalPrice.toString(),
+      })),
+      subtotal: invoice.subtotal.toString(),
+      discount: invoice.discount.toString(),
+      tax: invoice.tax.toString(),
+      total: invoice.total.toString(),
+      currency: order.currency,
+    });
+
+    const file = await this.filesService.upload(
+      order.conference.organizationId,
+      order.registration.userId,
+      {
+        fileName: `${invoice.invoiceNumber}.pdf`,
+        mimeType: 'application/pdf',
+        size: buffer.length,
+        buffer,
+      },
+    );
+
+    return this.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { documentFileId: file.id },
+    });
   }
 
   async findOwned(userId: string, orderId: string) {

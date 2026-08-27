@@ -11,7 +11,11 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
         .fn()
         .mockResolvedValue({ id: 'file-1', organizationId: 'org-1' }),
     },
-    importJob: { create: jest.fn(), findFirst: jest.fn() },
+    importJob: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -115,5 +119,34 @@ describe('ImportsService.findById', () => {
     const service = new ImportsService(prisma, fakeQueue());
 
     await expect(service.findById('org-1', 'import-1')).resolves.toEqual(job);
+  });
+});
+
+describe('ImportsService.findAllForConference', () => {
+  it('throws NotFoundException when the conference is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const service = new ImportsService(prisma, fakeQueue());
+
+    await expect(
+      service.findAllForConference('org-1', 'conf-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('lists import jobs for the conference, most recent first', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: 'import-1' }]);
+    const prisma = fakePrisma({
+      importJob: { create: jest.fn(), findFirst: jest.fn(), findMany },
+    });
+    const service = new ImportsService(prisma, fakeQueue());
+
+    const result = await service.findAllForConference('org-1', 'conf-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org-1', conferenceId: 'conf-1' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(result).toEqual([{ id: 'import-1' }]);
   });
 });

@@ -56,7 +56,12 @@ export interface ProgramSession {
   status: SessionStatus;
 }
 
-/** `GET conferences/:conferenceId/program` (public) — full rows, no field stripping. */
+/**
+ * Full rows, no field stripping — returned by both the public
+ * `GET conferences/:conferenceId/program` (PUBLISHED only) and the
+ * organizer-only `GET sessions/:id` (any status), which share the same
+ * `speakers`/`presentations` include on the backend.
+ */
 export interface PublicProgramSession extends ProgramSession {
   speakers: SessionSpeaker[];
   presentations: PresentationAssignment[];

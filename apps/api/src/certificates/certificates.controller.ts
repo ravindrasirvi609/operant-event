@@ -43,6 +43,16 @@ export class CertificatesController {
     return this.certificatesService.issue(organizationId, certificateId);
   }
 
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.CERTIFICATE_MANAGE)
+  @Post('certificates/:id/revoke')
+  revoke(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('id') certificateId: string,
+  ) {
+    return this.certificatesService.revoke(organizationId, certificateId);
+  }
+
   // Registrant-facing: the caller's own certificate.
   @UseGuards(JwtAuthGuard)
   @Get('certificates/:id')

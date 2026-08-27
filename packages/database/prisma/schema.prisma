@@ -949,6 +949,8 @@ model Notification {
   title          String
   message        String
   data           Json?
+  entityType     String?
+  entityId       String?
   readAt         DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime @default(now())

@@ -49,6 +49,8 @@ export class DecisionsService {
         conferenceId: abstract.conferenceId,
         userId: abstract.submittedBy,
         templateData: { abstractTitle: abstract.title },
+        entityType: 'abstract',
+        entityId: abstractId,
       });
     }
 
@@ -85,6 +87,8 @@ export class DecisionsService {
       conferenceId: abstract.conferenceId,
       userId: abstract.submittedBy,
       templateData: { abstractTitle: abstract.title, reason: dto.reason },
+      entityType: 'abstract',
+      entityId: abstractId,
     });
 
     return revisionRequest;

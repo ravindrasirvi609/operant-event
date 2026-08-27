@@ -7,7 +7,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import type { OrderStatus } from '@prisma/client';
+import type { OrderStatus } from '@operant-event/database';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';

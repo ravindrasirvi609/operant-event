@@ -26,6 +26,19 @@ export function usePublicProgram(conferenceId: string) {
   });
 }
 
+function sessionDetailQueryKey(sessionId: string) {
+  return ['sessions', sessionId];
+}
+
+/** Organizer-facing single session — `GET sessions/:id`, includes `speakers`/`presentations` regardless of status. */
+export function useSessionDetail(sessionId: string) {
+  return useQuery({
+    queryKey: sessionDetailQueryKey(sessionId),
+    queryFn: () => apiGet<PublicProgramSession>(`sessions/${sessionId}`),
+    enabled: Boolean(sessionId),
+  });
+}
+
 export interface SessionFormInput {
   trackId?: string;
   title: string;
@@ -52,8 +65,9 @@ export function useUpdateSession(conferenceId: string) {
   return useMutation({
     mutationFn: ({ sessionId, input }: { sessionId: string; input: Partial<SessionFormInput> }) =>
       apiPatch<ProgramSession>(`sessions/${sessionId}`, input),
-    onSuccess: () => {
+    onSuccess: (_, { sessionId }) => {
       void queryClient.invalidateQueries({ queryKey: sessionsQueryKey(conferenceId) });
+      void queryClient.invalidateQueries({ queryKey: sessionDetailQueryKey(sessionId) });
     },
   });
 }
@@ -63,8 +77,9 @@ export function usePublishSession(conferenceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: string) => apiPost<ProgramSession>(`sessions/${sessionId}/publish`),
-    onSuccess: () => {
+    onSuccess: (_, sessionId) => {
       void queryClient.invalidateQueries({ queryKey: sessionsQueryKey(conferenceId) });
+      void queryClient.invalidateQueries({ queryKey: sessionDetailQueryKey(sessionId) });
     },
   });
 }
@@ -75,8 +90,9 @@ export function useAssignSpeakers(conferenceId: string) {
   return useMutation({
     mutationFn: ({ sessionId, assignments }: { sessionId: string; assignments: { speakerId: string; role: SpeakerRole }[] }) =>
       apiPut(`sessions/${sessionId}/speakers`, { assignments }),
-    onSuccess: () => {
+    onSuccess: (_, { sessionId }) => {
       void queryClient.invalidateQueries({ queryKey: sessionsQueryKey(conferenceId) });
+      void queryClient.invalidateQueries({ queryKey: sessionDetailQueryKey(sessionId) });
     },
   });
 }

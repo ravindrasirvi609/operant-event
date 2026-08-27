@@ -54,6 +54,8 @@ const payload = {
   conferenceId: 'conf-1',
   userId: 'user-1',
   templateData: { participantName: 'Jane' },
+  entityType: 'abstract',
+  entityId: 'abstract-1',
 };
 
 describe('NotificationEventsListener.onAbstractAccepted', () => {
@@ -132,6 +134,8 @@ describe('NotificationEventsListener.onAbstractAccepted', () => {
       'Congratulations Jane',
       'Your abstract was accepted, Jane.',
       payload.templateData,
+      'abstract',
+      'abstract-1',
     );
   });
 });

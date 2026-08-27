@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type { SubmitReviewDto } from './dto/submit-review.dto';
 

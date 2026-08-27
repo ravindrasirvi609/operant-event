@@ -1,4 +1,4 @@
-import type { ConferenceStatus } from '@prisma/client';
+import type { ConferenceStatus } from '@operant-event/database';
 
 const ALLOWED_TRANSITIONS: Record<ConferenceStatus, ConferenceStatus[]> = {
   DRAFT: ['OPEN', 'ARCHIVED'],

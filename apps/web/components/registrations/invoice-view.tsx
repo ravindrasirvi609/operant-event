@@ -1,11 +1,6 @@
+import { FileDownloadLink } from '@/components/files/file-download-link';
 import type { Invoice } from '@/lib/registrations/types';
 
-/**
- * `Invoice.documentFileId` is always `null` today — PDF rendering is a
- * backend-deferred item (see `docs/plans/worker/04-invoice-pdf.md`) — so
- * this always shows the line items plus a "not yet available" state
- * rather than a broken download link.
- */
 export function InvoiceView({ invoice }: { invoice: Invoice | null }) {
   if (!invoice) {
     return <p className="text-sm text-muted-foreground">No invoice has been issued for this order yet.</p>;
@@ -27,7 +22,7 @@ export function InvoiceView({ invoice }: { invoice: Invoice | null }) {
         <dd>{new Date(invoice.issuedAt).toLocaleDateString()}</dd>
       </dl>
       {invoice.documentFileId ? (
-        <p className="text-xs text-muted-foreground">PDF available.</p>
+        <FileDownloadLink fileId={invoice.documentFileId} label="Download invoice PDF" />
       ) : (
         <p className="text-xs text-muted-foreground">PDF not yet available.</p>
       )}

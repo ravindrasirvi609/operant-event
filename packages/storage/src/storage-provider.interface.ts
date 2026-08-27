@@ -18,6 +18,8 @@ export interface UploadResult {
 export interface StorageProvider {
   upload(input: UploadInput): Promise<UploadResult>;
   getDownloadUrl(storageKey: string): Promise<string>;
+  /** Reads the file's raw bytes back — needed by any consumer that must process a previously-uploaded file itself (e.g. parsing an import's source CSV), not just hand the caller a URL. */
+  download(storageKey: string): Promise<Buffer>;
 }
 
 export const STORAGE_PROVIDER = Symbol('STORAGE_PROVIDER');

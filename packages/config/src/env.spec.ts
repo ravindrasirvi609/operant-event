@@ -69,4 +69,43 @@ describe('loadEnv', () => {
     expect(env.RAZORPAY_KEY_ID).toBe('rzp_test_123');
     expect(env.RAZORPAY_KEY_SECRET).toBe('secret');
   });
+
+  it('defaults UPLOADS_DIR to ./uploads', () => {
+    const env = loadEnv(validBase);
+    expect(env.UPLOADS_DIR).toBe('./uploads');
+  });
+
+  it('accepts an explicit absolute UPLOADS_DIR', () => {
+    const env = loadEnv({ ...validBase, UPLOADS_DIR: '/var/data/operant-uploads' });
+    expect(env.UPLOADS_DIR).toBe('/var/data/operant-uploads');
+  });
+
+  it('leaves RESEND_API_KEY and EMAIL_FROM_ADDRESS undefined when not set', () => {
+    const env = loadEnv(validBase);
+    expect(env.RESEND_API_KEY).toBeUndefined();
+    expect(env.EMAIL_FROM_ADDRESS).toBeUndefined();
+  });
+
+  it('accepts RESEND_API_KEY and EMAIL_FROM_ADDRESS when provided', () => {
+    const env = loadEnv({
+      ...validBase,
+      RESEND_API_KEY: 're_test_123',
+      EMAIL_FROM_ADDRESS: 'noreply@example.com',
+    });
+    expect(env.RESEND_API_KEY).toBe('re_test_123');
+    expect(env.EMAIL_FROM_ADDRESS).toBe('noreply@example.com');
+  });
+
+  it('defaults FRONTEND_URL to http://localhost:3000', () => {
+    const env = loadEnv(validBase);
+    expect(env.FRONTEND_URL).toBe('http://localhost:3000');
+  });
+
+  it('accepts an explicit FRONTEND_URL', () => {
+    const env = loadEnv({
+      ...validBase,
+      FRONTEND_URL: 'https://app.example.com',
+    });
+    expect(env.FRONTEND_URL).toBe('https://app.example.com');
+  });
 });

@@ -50,4 +50,15 @@ export class ImportsController {
   ) {
     return this.importsService.findById(organizationId, importJobId);
   }
+
+  @Get('conferences/:conferenceId/imports')
+  findAllForConference(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('conferenceId') conferenceId: string,
+  ) {
+    return this.importsService.findAllForConference(
+      organizationId,
+      conferenceId,
+    );
+  }
 }

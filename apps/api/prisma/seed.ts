@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@operant-event/database';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { loadEnv } from '@operant-event/config';
 import { PERMISSION_CATALOGUE, SYSTEM_ROLES } from '../src/common/permissions/permissions.catalogue';

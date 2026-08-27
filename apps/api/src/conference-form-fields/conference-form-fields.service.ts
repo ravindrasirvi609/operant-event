@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type { CreateFormFieldDto } from './dto/create-form-field.dto';
 import type { UpdateFormFieldDto } from './dto/update-form-field.dto';

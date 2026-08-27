@@ -11,7 +11,13 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     programSession: { findFirst: jest.fn() },
     abstract: { findFirst: jest.fn() },
-    presentationAssignment: { create: jest.fn() },
+    presentationAssignment: {
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -188,5 +194,150 @@ describe('PresentationsService.assign', () => {
         ...presentationWindow,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('PresentationsService.findAllForSession', () => {
+  it('throws NotFoundException when the session is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      programSession: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const service = new PresentationsService(prisma, fakeConflictService());
+
+    await expect(
+      service.findAllForSession('org-1', 'session-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('lists presentations for the session ordered by sortOrder, including the abstract', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = fakePrisma({
+      programSession: { findFirst: jest.fn().mockResolvedValue(session) },
+      presentationAssignment: {
+        create: jest.fn(),
+        findMany,
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    });
+    const service = new PresentationsService(prisma, fakeConflictService());
+
+    await service.findAllForSession('org-1', 'session-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { sessionId: 'session-1' },
+      include: { abstract: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+  });
+});
+
+const presentationAssignment = {
+  id: 'assignment-1',
+  sessionId: 'session-1',
+  abstractId: 'abstract-1',
+  startTime: new Date(presentationWindow.startTime),
+  endTime: new Date(presentationWindow.endTime),
+  session,
+};
+
+describe('PresentationsService.update', () => {
+  it('throws NotFoundException when the presentation is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      presentationAssignment: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    });
+    const service = new PresentationsService(prisma, fakeConflictService());
+
+    await expect(
+      service.update('org-1', 'assignment-x', { sortOrder: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('re-runs the window and double-booking checks and updates the assignment', async () => {
+    const update = jest.fn().mockResolvedValue({ id: 'assignment-1' });
+    const conflictService = fakeConflictService();
+    const prisma = fakePrisma({
+      presentationAssignment: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(presentationAssignment),
+        update,
+        delete: jest.fn(),
+      },
+    });
+    const service = new PresentationsService(prisma, conflictService);
+
+    await service.update('org-1', 'assignment-1', {
+      presentationType: 'POSTER',
+      sortOrder: 3,
+    });
+
+    expect(
+      conflictService.assertPresentationWithinSession,
+    ).toHaveBeenCalledWith(session, {
+      startTime: presentationAssignment.startTime,
+      endTime: presentationAssignment.endTime,
+    });
+    expect(conflictService.assertNoAbstractDoubleBooking).toHaveBeenCalledWith(
+      'abstract-1',
+      'session-1',
+      {
+        startTime: presentationAssignment.startTime,
+        endTime: presentationAssignment.endTime,
+      },
+    );
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'assignment-1' },
+      data: {
+        presentationType: 'POSTER',
+        sortOrder: 3,
+        startTime: presentationAssignment.startTime,
+        endTime: presentationAssignment.endTime,
+      },
+    });
+  });
+});
+
+describe('PresentationsService.remove', () => {
+  it('throws NotFoundException when the presentation is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      presentationAssignment: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    });
+    const service = new PresentationsService(prisma, fakeConflictService());
+
+    await expect(
+      service.remove('org-1', 'assignment-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deletes the presentation assignment', async () => {
+    const del = jest.fn().mockResolvedValue({ id: 'assignment-1' });
+    const prisma = fakePrisma({
+      presentationAssignment: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(presentationAssignment),
+        update: jest.fn(),
+        delete: del,
+      },
+    });
+    const service = new PresentationsService(prisma, fakeConflictService());
+
+    await service.remove('org-1', 'assignment-1');
+
+    expect(del).toHaveBeenCalledWith({ where: { id: 'assignment-1' } });
   });
 });

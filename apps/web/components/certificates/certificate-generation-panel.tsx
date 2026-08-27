@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CertificateStatusBadge } from '@/components/certificates/certificate-status-badge';
-import { useGenerateCertificates, useIssueCertificate } from '@/hooks/use-certificates';
+import { useGenerateCertificates, useIssueCertificate, useRevokeCertificate } from '@/hooks/use-certificates';
 import type { Certificate } from '@/lib/certificates/types';
 
 /**
@@ -16,8 +17,10 @@ import type { Certificate } from '@/lib/certificates/types';
 export function CertificateGenerationPanel({ conferenceId }: { conferenceId: string }) {
   const generate = useGenerateCertificates(conferenceId);
   const issue = useIssueCertificate(conferenceId);
+  const revoke = useRevokeCertificate(conferenceId);
   const [generated, setGenerated] = useState<Certificate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   async function handleGenerate() {
     setError(null);
@@ -36,6 +39,18 @@ export function CertificateGenerationPanel({ conferenceId }: { conferenceId: str
       setGenerated((current) => current?.map((cert) => (cert.id === updated.id ? updated : cert)) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to issue certificate.');
+    }
+  }
+
+  async function handleRevoke(certificateId: string) {
+    setError(null);
+    try {
+      const updated = await revoke.mutateAsync(certificateId);
+      setGenerated((current) => current?.map((cert) => (cert.id === updated.id ? updated : cert)) ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke certificate.');
+    } finally {
+      setRevokingId(null);
     }
   }
 
@@ -65,11 +80,29 @@ export function CertificateGenerationPanel({ conferenceId }: { conferenceId: str
                     Issue
                   </Button>
                 ) : null}
+                {certificate.status === 'ISSUED' ? (
+                  <Button variant="destructive" size="sm" onClick={() => setRevokingId(certificate.id)}>
+                    Revoke
+                  </Button>
+                ) : null}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={revokingId !== null}
+        onOpenChange={(open) => !open && setRevokingId(null)}
+        title="Revoke this certificate?"
+        description="There is no un-revoke action — the holder will no longer be able to verify this certificate."
+        confirmLabel="Revoke"
+        isConfirming={revoke.isPending}
+        onConfirm={() => {
+          if (revokingId) {
+            void handleRevoke(revokingId);
+          }
+        }}
+      />
     </div>
   );
 }

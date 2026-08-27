@@ -95,6 +95,8 @@ export class NotificationEventsListener {
       subject,
       body,
       payload.templateData,
+      payload.entityType,
+      payload.entityId,
     );
   }
 }

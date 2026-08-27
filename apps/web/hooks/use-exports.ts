@@ -1,25 +1,35 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api/client';
 import { useJobPolling } from '@/lib/jobs/use-job-polling';
 import type { ExportJob, ExportType } from '@/lib/jobs/types';
 
-/** 202 Accepted — returns the job row immediately at status QUEUED, never blocks on the job actually running. */
+function exportHistoryQueryKey(conferenceId: string) {
+  return ['conferences', conferenceId, 'exports'];
+}
+
+/** 202 Accepted — returns the job row immediately at status QUEUED, never blocks on the job actually running. apps/worker picks it up from the `exports` BullMQ queue. */
 export function useCreateExport(conferenceId: string) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (type: ExportType) => apiPost<ExportJob>(`conferences/${conferenceId}/exports`, { type }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: exportHistoryQueryKey(conferenceId) });
+    },
   });
 }
 
-/**
- * Polls `GET exports/:id` until DONE/FAILED. Note: as of this phase, no
- * worker process consumes the export BullMQ queue at all — a real job
- * is enqueued, but nothing transitions it past QUEUED. This poller is
- * still the correct, real pattern to have in place; it will simply
- * never observe a terminal state until the worker exists. The UI must
- * say so plainly rather than implying the export is "in progress."
- */
+/** `GET conferences/:conferenceId/exports`, most recent first — the real backend history, not a per-session cache. */
+export function useExportHistory(conferenceId: string) {
+  return useQuery({
+    queryKey: exportHistoryQueryKey(conferenceId),
+    queryFn: () => apiGet<ExportJob[]>(`conferences/${conferenceId}/exports`),
+    enabled: Boolean(conferenceId),
+  });
+}
+
+/** Polls `GET exports/:id` until DONE/FAILED — apps/worker consumes the `exports` queue and moves it through RUNNING to a terminal status. */
 export function useExportJob(exportId: string) {
   return useJobPolling<ExportJob>(['exports', exportId], () => apiGet<ExportJob>(`exports/${exportId}`), {
     intervalMs: 4000,

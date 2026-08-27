@@ -19,4 +19,7 @@ export interface NotificationEventPayload {
   userId: string;
   /** Rendered against the resolved EmailTemplate.body/subject as {{key}}. */
   templateData: Record<string, string>;
+  /** Structured reference to the entity this event concerns, e.g. 'certificate' + the certificate id. */
+  entityType?: string;
+  entityId?: string;
 }

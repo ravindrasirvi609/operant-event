@@ -54,6 +54,16 @@ export class SessionsController {
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(PERMISSIONS.PROGRAM_MANAGE)
+  @Get('sessions/:id')
+  findOneForOrganizer(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('id') sessionId: string,
+  ) {
+    return this.sessionsService.findOneForOrganizer(organizationId, sessionId);
+  }
+
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSIONS.PROGRAM_MANAGE)
   @Patch('sessions/:id')
   update(
     @CurrentOrganizationId() organizationId: string,

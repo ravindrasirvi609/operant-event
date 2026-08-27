@@ -30,7 +30,8 @@ type PresentationValues = z.infer<typeof presentationSchema>;
  * hard requirement (400 otherwise) — but the window-inside-session (400)
  * and no-double-booking (409) checks are NOT duplicated here, only
  * `endTime > startTime`; a real conflict still surfaces as the
- * backend's own error message.
+ * backend's own error message. Edit/remove for an already-scheduled
+ * presentation live in `<PresentationList>`, not this create-only form.
  */
 export function PresentationAssignmentForm({ conferenceId, sessionId }: { conferenceId: string; sessionId: string }) {
   const abstractsQuery = useOrganizerAbstracts(conferenceId);

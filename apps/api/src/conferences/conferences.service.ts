@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { ConferenceStatus } from '@prisma/client';
+import type { ConferenceStatus } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { slugify } from '../common/utils/slugify';
 import { isValidConferenceStatusTransition } from './conference-status.util';

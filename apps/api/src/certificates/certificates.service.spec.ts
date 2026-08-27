@@ -3,9 +3,19 @@ import type { EventEmitter2 } from '@nestjs/event-emitter';
 import { CertificatesService } from './certificates.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
 import type { CertificateEligibilityService } from './certificate-eligibility.service';
+import type { FilesService } from '../files/files.service';
 
 function fakeEventEmitter(): EventEmitter2 {
   return { emit: jest.fn() } as unknown as EventEmitter2;
+}
+
+function fakeFilesService(
+  overrides: Partial<Record<keyof FilesService, jest.Mock>> = {},
+) {
+  return {
+    upload: jest.fn().mockResolvedValue({ id: 'file-1' }),
+    ...overrides,
+  } as unknown as FilesService;
 }
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
@@ -51,6 +61,7 @@ describe('CertificatesService.generateForConference', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(
@@ -69,6 +80,7 @@ describe('CertificatesService.generateForConference', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(
@@ -96,6 +108,7 @@ describe('CertificatesService.generateForConference', () => {
       prisma,
       fakeEligibility(isEligible),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await service.generateForConference('org-1', 'conf-1');
@@ -132,6 +145,7 @@ describe('CertificatesService.generateForConference', () => {
       prisma,
       fakeEligibility(isEligible),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     const created = await service.generateForConference('org-1', 'conf-1');
@@ -178,6 +192,7 @@ describe('CertificatesService.generateForConference', () => {
       prisma,
       fakeEligibility(isEligible),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     const created = await service.generateForConference('org-1', 'conf-1');
@@ -202,6 +217,7 @@ describe('CertificatesService.issue', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(service.issue('org-1', 'cert-x')).rejects.toBeInstanceOf(
@@ -209,12 +225,13 @@ describe('CertificatesService.issue', () => {
     );
   });
 
-  it('transitions an ELIGIBLE certificate to ISSUED with an issuedAt timestamp, and emits certificate.issued', async () => {
+  it('transitions an ELIGIBLE certificate to ISSUED, renders and uploads a PDF, sets fileId, and emits certificate.issued', async () => {
     const update = jest.fn().mockResolvedValue({
       id: 'cert-1',
       status: 'ISSUED',
       certificateNumber: 'CERT-000001',
     });
+    const upload = jest.fn().mockResolvedValue({ id: 'file-1' });
     const eventEmitter = fakeEventEmitter();
     const prisma = fakePrisma({
       certificate: {
@@ -222,8 +239,14 @@ describe('CertificatesService.issue', () => {
           id: 'cert-1',
           status: 'ELIGIBLE',
           conferenceId: 'conf-1',
+          certificateNumber: 'CERT-000001',
           certificateType: 'PARTICIPATION',
-          registration: { userId: 'user-1' },
+          verificationCode: 'ABC123',
+          conference: { name: 'Operant Summit 2027', organizationId: 'org-1' },
+          registration: {
+            userId: 'user-1',
+            user: { firstName: 'Jane', lastName: 'Doe' },
+          },
         }),
         findUnique: jest.fn(),
         count: jest.fn(),
@@ -235,13 +258,23 @@ describe('CertificatesService.issue', () => {
       prisma,
       fakeEligibility(),
       eventEmitter,
+      fakeFilesService({ upload }),
     );
 
     await service.issue('org-1', 'cert-1');
 
+    expect(upload).toHaveBeenCalledWith(
+      'org-1',
+      'user-1',
+      expect.objectContaining({
+        fileName: 'CERT-000001.pdf',
+        mimeType: 'application/pdf',
+        buffer: expect.any(Buffer),
+      }),
+    );
     expect(update).toHaveBeenCalledWith({
       where: { id: 'cert-1' },
-      data: { status: 'ISSUED', issuedAt: expect.any(Date) },
+      data: { status: 'ISSUED', issuedAt: expect.any(Date), fileId: 'file-1' },
     });
     expect(eventEmitter.emit).toHaveBeenCalledWith('certificate.issued', {
       organizationId: 'org-1',
@@ -251,6 +284,8 @@ describe('CertificatesService.issue', () => {
         certificateType: 'PARTICIPATION',
         certificateNumber: 'CERT-000001',
       },
+      entityType: 'certificate',
+      entityId: 'cert-1',
     });
   });
 
@@ -271,6 +306,7 @@ describe('CertificatesService.issue', () => {
       prisma,
       fakeEligibility(),
       eventEmitter,
+      fakeFilesService(),
     );
 
     const result = await service.issue('org-1', 'cert-1');
@@ -278,6 +314,85 @@ describe('CertificatesService.issue', () => {
     expect(update).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
     expect(result).toBe(alreadyIssued);
+  });
+});
+
+describe('CertificatesService.revoke', () => {
+  it('throws NotFoundException when the certificate is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      certificate: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+      fakeFilesService(),
+    );
+
+    await expect(service.revoke('org-1', 'cert-x')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('rejects revoking a certificate that has not been ISSUED', async () => {
+    const prisma = fakePrisma({
+      certificate: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'cert-1', status: 'ELIGIBLE' }),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+      fakeFilesService(),
+    );
+
+    await expect(service.revoke('org-1', 'cert-1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('transitions an ISSUED certificate to REVOKED', async () => {
+    const update = jest
+      .fn()
+      .mockResolvedValue({ id: 'cert-1', status: 'REVOKED' });
+    const prisma = fakePrisma({
+      certificate: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'cert-1', status: 'ISSUED' }),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update,
+      },
+    });
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+      fakeFilesService(),
+    );
+
+    const result = await service.revoke('org-1', 'cert-1');
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'cert-1' },
+      data: { status: 'REVOKED' },
+    });
+    expect(result).toEqual({ id: 'cert-1', status: 'REVOKED' });
   });
 });
 
@@ -296,6 +411,7 @@ describe('CertificatesService.findOwned', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(service.findOwned('user-1', 'cert-1')).rejects.toBeInstanceOf(
@@ -319,6 +435,7 @@ describe('CertificatesService.verifyByCode', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(service.verifyByCode('BADCODE')).rejects.toBeInstanceOf(
@@ -340,6 +457,7 @@ describe('CertificatesService.verifyByCode', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     await expect(service.verifyByCode('ABC123')).rejects.toBeInstanceOf(
@@ -375,6 +493,7 @@ describe('CertificatesService.verifyByCode', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     const result = await service.verifyByCode('ABC123');
@@ -416,6 +535,7 @@ describe('CertificatesService.verifyByCode', () => {
       prisma,
       fakeEligibility(),
       fakeEventEmitter(),
+      fakeFilesService(),
     );
 
     const result = await service.verifyByCode('ABC123');

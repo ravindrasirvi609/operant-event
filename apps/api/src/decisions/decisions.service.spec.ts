@@ -142,6 +142,8 @@ describe('DecisionsService.recordDecision', () => {
       conferenceId: 'conf-1',
       userId: 'author-1',
       templateData: { abstractTitle: 'A Study' },
+      entityType: 'abstract',
+      entityId: 'abs-1',
     });
   });
 
@@ -242,6 +244,8 @@ describe('DecisionsService.requestRevision', () => {
           abstractTitle: 'A Study',
           reason: 'Please revise the methodology section.',
         },
+        entityType: 'abstract',
+        entityId: 'abs-1',
       },
     );
   });

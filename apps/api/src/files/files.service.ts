@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
-import {
-  STORAGE_PROVIDER,
-  type StorageProvider,
-} from './storage-provider.interface';
+import { STORAGE_PROVIDER, type StorageProvider } from '@operant-event/storage';
 
 export interface UploadFileInput {
   fileName: string;

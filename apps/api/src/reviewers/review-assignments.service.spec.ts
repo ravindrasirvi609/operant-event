@@ -141,6 +141,8 @@ describe('ReviewAssignmentsService.assign', () => {
       conferenceId: 'conf-1',
       userId: 'user-2',
       templateData: { abstractTitle: 'A Study' },
+      entityType: 'reviewAssignment',
+      entityId: 'assignment-1',
     });
   });
 
@@ -243,6 +245,8 @@ describe('ReviewAssignmentsService.reassign', () => {
       conferenceId: 'conf-1',
       userId: 'user-3',
       templateData: { abstractTitle: 'A Study' },
+      entityType: 'reviewAssignment',
+      entityId: 'assignment-2',
     });
   });
 });

@@ -5,13 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Certificate } from '@prisma/client';
+import type { Certificate } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { FilesService } from '../files/files.service';
 import { CertificateEligibilityService } from './certificate-eligibility.service';
 import { formatSequenceNumber } from '../common/utils/sequence-number.util';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import { generateQrCode } from '../common/utils/qr-code.util';
 import { NOTIFICATION_EVENTS } from '../notifications/notification.events';
+import { renderCertificatePdf } from '../common/pdf/pdf-renderer.util';
 
 const CERTIFICATE_TYPES = [
   'PARTICIPATION',
@@ -29,6 +31,7 @@ export class CertificatesService {
     private readonly prisma: PrismaService,
     private readonly eligibilityService: CertificateEligibilityService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -92,7 +95,6 @@ export class CertificatesService {
     return created;
   }
 
-  /** Skips the (deferred) PDF render — transitions straight to ISSUED. */
   async issue(organizationId: string, certificateId: string) {
     const certificate = await this.assertCertificateInOrganization(
       organizationId,
@@ -101,9 +103,39 @@ export class CertificatesService {
     if (certificate.status === 'ISSUED') {
       return certificate;
     }
+
+    const settings = await this.prisma.conferenceSetting.findUnique({
+      where: { conferenceId: certificate.conferenceId },
+    });
+    const holderName = this.resolveHolderName(
+      settings?.certificateShowFullName ?? true,
+      certificate.registration.user.firstName,
+      certificate.registration.user.lastName,
+    );
+
+    const buffer = await renderCertificatePdf({
+      certificateNumber: certificate.certificateNumber,
+      certificateType: certificate.certificateType,
+      holderName,
+      conferenceName: certificate.conference.name,
+      issuedAt: new Date(),
+      verificationCode: certificate.verificationCode,
+    });
+
+    const file = await this.filesService.upload(
+      certificate.conference.organizationId,
+      certificate.registration.userId,
+      {
+        fileName: `${certificate.certificateNumber}.pdf`,
+        mimeType: 'application/pdf',
+        size: buffer.length,
+        buffer,
+      },
+    );
+
     const updated = await this.prisma.certificate.update({
       where: { id: certificateId },
-      data: { status: 'ISSUED', issuedAt: new Date() },
+      data: { status: 'ISSUED', issuedAt: new Date(), fileId: file.id },
     });
 
     this.eventEmitter.emit(NOTIFICATION_EVENTS.CERTIFICATE_ISSUED, {
@@ -114,9 +146,27 @@ export class CertificatesService {
         certificateType: certificate.certificateType,
         certificateNumber: updated.certificateNumber,
       },
+      entityType: 'certificate',
+      entityId: certificateId,
     });
 
     return updated;
+  }
+
+  async revoke(organizationId: string, certificateId: string) {
+    const certificate = await this.assertCertificateInOrganization(
+      organizationId,
+      certificateId,
+    );
+    if (certificate.status !== 'ISSUED') {
+      throw new BadRequestException(
+        'Only an ISSUED certificate can be revoked.',
+      );
+    }
+    return this.prisma.certificate.update({
+      where: { id: certificateId },
+      data: { status: 'REVOKED' },
+    });
   }
 
   async findOwned(userId: string, certificateId: string) {
@@ -147,10 +197,11 @@ export class CertificatesService {
       where: { conferenceId: certificate.conferenceId },
     });
     const { firstName, lastName } = certificate.registration.user;
-    const holderName =
-      (settings?.certificateShowFullName ?? true)
-        ? `${firstName} ${lastName}`
-        : `${firstName} ${lastName.charAt(0)}.`;
+    const holderName = this.resolveHolderName(
+      settings?.certificateShowFullName ?? true,
+      firstName,
+      lastName,
+    );
 
     return {
       certificateNumber: certificate.certificateNumber,
@@ -197,13 +248,23 @@ export class CertificatesService {
     );
   }
 
+  private resolveHolderName(
+    showFullName: boolean,
+    firstName: string,
+    lastName: string,
+  ): string {
+    return showFullName
+      ? `${firstName} ${lastName}`
+      : `${firstName} ${lastName.charAt(0)}.`;
+  }
+
   private async assertCertificateInOrganization(
     organizationId: string,
     certificateId: string,
   ) {
     const certificate = await this.prisma.certificate.findFirst({
       where: { id: certificateId, conference: { organizationId } },
-      include: { registration: true },
+      include: { registration: { include: { user: true } }, conference: true },
     });
     if (!certificate) {
       throw new NotFoundException('Certificate not found.');

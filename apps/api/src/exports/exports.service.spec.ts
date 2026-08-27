@@ -6,7 +6,11 @@ import type { ExportQueueService } from './export-queue.service';
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     conference: { findFirst: jest.fn().mockResolvedValue({ id: 'conf-1' }) },
-    exportJob: { create: jest.fn(), findFirst: jest.fn() },
+    exportJob: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -91,5 +95,34 @@ describe('ExportsService.findById', () => {
     const service = new ExportsService(prisma, fakeQueue());
 
     await expect(service.findById('org-1', 'export-1')).resolves.toEqual(job);
+  });
+});
+
+describe('ExportsService.findAllForConference', () => {
+  it('throws NotFoundException when the conference is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      conference: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+    const service = new ExportsService(prisma, fakeQueue());
+
+    await expect(
+      service.findAllForConference('org-1', 'conf-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('lists export jobs for the conference, most recent first', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: 'export-1' }]);
+    const prisma = fakePrisma({
+      exportJob: { create: jest.fn(), findFirst: jest.fn(), findMany },
+    });
+    const service = new ExportsService(prisma, fakeQueue());
+
+    const result = await service.findAllForConference('org-1', 'conf-1');
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org-1', conferenceId: 'conf-1' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(result).toEqual([{ id: 'export-1' }]);
   });
 });

@@ -56,6 +56,14 @@ export class ImportsService {
     return job;
   }
 
+  async findAllForConference(organizationId: string, conferenceId: string) {
+    await this.assertConferenceInOrganization(organizationId, conferenceId);
+    return this.prisma.importJob.findMany({
+      where: { organizationId, conferenceId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   private async assertConferenceInOrganization(
     organizationId: string,
     conferenceId: string,

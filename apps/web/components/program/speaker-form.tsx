@@ -18,7 +18,6 @@ const speakerSchema = z.object({
 
 type SpeakerValues = z.infer<typeof speakerSchema>;
 
-/** Create-only, per the backend — there is no edit/delete route once a speaker exists. */
 export function SpeakerForm({ conferenceId }: { conferenceId: string }) {
   const createSpeaker = useCreateSpeaker(conferenceId);
   const {

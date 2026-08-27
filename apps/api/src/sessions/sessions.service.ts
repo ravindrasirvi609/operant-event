@@ -156,6 +156,17 @@ export class SessionsService {
     });
   }
 
+  async findOneForOrganizer(organizationId: string, sessionId: string) {
+    const session = await this.prisma.programSession.findFirst({
+      where: { id: sessionId, conference: { organizationId } },
+      include: PROGRAM_INCLUDE,
+    });
+    if (!session) {
+      throw new NotFoundException('Session not found.');
+    }
+    return session;
+  }
+
   async findAllForOrganizer(organizationId: string, conferenceId: string) {
     await this.assertConferenceInOrganization(organizationId, conferenceId);
     return this.prisma.programSession.findMany({

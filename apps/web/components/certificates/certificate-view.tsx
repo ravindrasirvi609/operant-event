@@ -1,7 +1,7 @@
 import { CertificateStatusBadge } from '@/components/certificates/certificate-status-badge';
+import { FileDownloadLink } from '@/components/files/file-download-link';
 import type { Certificate } from '@/lib/certificates/types';
 
-/** `fileId` is always null today — PDF rendering is a backend-deferred item, same pattern as `<InvoiceView>` in Phase 4. */
 export function CertificateView({ certificate }: { certificate: Certificate }) {
   return (
     <div className="max-w-sm space-y-3 rounded-lg border p-4 text-sm">
@@ -16,7 +16,7 @@ export function CertificateView({ certificate }: { certificate: Certificate }) {
         <dd>{certificate.issuedAt ? new Date(certificate.issuedAt).toLocaleDateString() : 'Not yet issued'}</dd>
       </dl>
       {certificate.fileId ? (
-        <p className="text-xs text-muted-foreground">PDF available.</p>
+        <FileDownloadLink fileId={certificate.fileId} label="Download certificate PDF" />
       ) : (
         <p className="text-xs text-muted-foreground">Certificate issued, document pending.</p>
       )}

@@ -9,12 +9,13 @@ export interface EmailTemplate {
 }
 
 /**
- * `type`/`data` carry whatever the triggering event happened to pass —
- * there is no `entityId`/`entityType`/`url` field on this model, so a
- * reliable "click this notification -> navigate to the relevant page"
- * feature is NOT supported by the backend today. `data`'s keys are
- * whatever template variables were interpolated (arbitrary strings),
- * not structured entity references.
+ * `data` still carries whatever template variables were interpolated
+ * into the notification's email (arbitrary strings, not a navigation
+ * contract). `entityType`/`entityId` are the structured reference —
+ * see `lib/notifications/entity-route.ts` for the entityType -> route
+ * mapping. Both are `null` for any notification emitted before this
+ * field existed, or for an event type the mapping doesn't cover yet;
+ * `notification-list.tsx` falls back to mark-read-only in that case.
  */
 export interface Notification {
   id: string;
@@ -24,6 +25,8 @@ export interface Notification {
   title: string;
   message: string;
   data: Record<string, unknown> | null;
+  entityType: string | null;
+  entityId: string | null;
   readAt: string | null;
   createdAt: string;
 }

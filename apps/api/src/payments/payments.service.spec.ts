@@ -174,6 +174,8 @@ describe('PaymentsService.handleWebhook', () => {
       conferenceId: 'conf-1',
       userId: 'user-1',
       templateData: { orderNumber: 'ORD-000001' },
+      entityType: 'order',
+      entityId: 'order-1',
     });
   });
 
@@ -418,6 +420,8 @@ describe('PaymentsService.approveManualPayment', () => {
       conferenceId: 'conf-1',
       userId: 'user-1',
       templateData: { orderNumber: 'ORD-000001' },
+      entityType: 'order',
+      entityId: 'order-1',
     });
   });
 

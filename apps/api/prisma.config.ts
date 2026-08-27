@@ -3,10 +3,13 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Schema now lives in @operant-event/database (shared with apps/worker) —
+// this keeps `pnpm --filter api exec prisma db push`/`generate` working
+// exactly as before, pointed at the shared source of truth.
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: "../../packages/database/prisma/schema.prisma",
   migrations: {
-    path: "prisma/migrations",
+    path: "../../packages/database/prisma/migrations",
   },
   datasource: {
     url: process.env["DATABASE_URL"],

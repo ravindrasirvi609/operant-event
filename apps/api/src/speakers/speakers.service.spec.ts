@@ -5,7 +5,18 @@ import type { PrismaService } from '../common/prisma/prisma.service';
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     conference: { findFirst: jest.fn() },
-    speaker: { create: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+    speaker: {
+      create: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    sessionSpeaker: { deleteMany: jest.fn() },
+    programSession: { updateMany: jest.fn() },
+    $transaction: jest.fn((callback: (transaction: unknown) => unknown) =>
+      callback(base),
+    ),
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -57,6 +68,98 @@ describe('SpeakersService.create', () => {
         country: 'USA',
       },
     });
+  });
+});
+
+describe('SpeakersService.update', () => {
+  it('throws NotFoundException when the speaker is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      speaker: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    });
+    const service = new SpeakersService(prisma);
+
+    await expect(
+      service.update('org-1', 'speaker-x', { name: 'New Name' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('updates only the provided fields', async () => {
+    const update = jest.fn().mockResolvedValue({ id: 'speaker-1' });
+    const prisma = fakePrisma({
+      speaker: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'speaker-1' }),
+        update,
+        delete: jest.fn(),
+      },
+    });
+    const service = new SpeakersService(prisma);
+
+    await service.update('org-1', 'speaker-1', { bio: 'Updated bio' });
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'speaker-1' },
+      data: { bio: 'Updated bio' },
+    });
+  });
+});
+
+describe('SpeakersService.remove', () => {
+  it('throws NotFoundException when the speaker is outside the caller organization', async () => {
+    const prisma = fakePrisma({
+      speaker: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+    });
+    const service = new SpeakersService(prisma);
+
+    await expect(service.remove('org-1', 'speaker-x')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('clears session-speaker links and chair/co-chair references before deleting the speaker', async () => {
+    const deleteMany = jest.fn().mockResolvedValue(undefined);
+    const updateMany = jest.fn().mockResolvedValue(undefined);
+    const del = jest.fn().mockResolvedValue({ id: 'speaker-1' });
+    const prisma = fakePrisma({
+      speaker: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: 'speaker-1' }),
+        update: jest.fn(),
+        delete: del,
+      },
+      sessionSpeaker: { deleteMany },
+      programSession: { updateMany },
+    });
+    const service = new SpeakersService(prisma);
+
+    await service.remove('org-1', 'speaker-1');
+
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { speakerId: 'speaker-1' },
+    });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { chairId: 'speaker-1' },
+      data: { chairId: null },
+    });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { coChairId: 'speaker-1' },
+      data: { coChairId: null },
+    });
+    expect(del).toHaveBeenCalledWith({ where: { id: 'speaker-1' } });
   });
 });
 

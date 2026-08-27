@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 @Injectable()
@@ -13,6 +13,8 @@ export class NotificationsService {
     title: string,
     message: string,
     data?: Record<string, unknown>,
+    entityType?: string,
+    entityId?: string,
   ) {
     return this.prisma.notification.create({
       data: {
@@ -22,6 +24,8 @@ export class NotificationsService {
         title,
         message,
         data: data as Prisma.InputJsonValue,
+        entityType,
+        entityId,
       },
     });
   }

@@ -269,7 +269,7 @@ export class PaymentsService {
 
   /** §20 trigger: "Payment successful". No-ops silently if the conference has since been deleted. */
   private async emitPaymentSucceeded(
-    order: { conferenceId: string; orderNumber: string },
+    order: { id: string; conferenceId: string; orderNumber: string },
     userId: string,
   ): Promise<void> {
     const conference = await this.prisma.conference.findUnique({
@@ -284,6 +284,8 @@ export class PaymentsService {
       conferenceId: order.conferenceId,
       userId,
       templateData: { orderNumber: order.orderNumber },
+      entityType: 'order',
+      entityId: order.id,
     });
   }
 

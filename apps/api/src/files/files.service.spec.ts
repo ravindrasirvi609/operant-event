@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { FilesService } from './files.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
-import type { StorageProvider } from './storage-provider.interface';
+import type { StorageProvider } from '@operant-event/storage';
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = { file: { create: jest.fn(), findFirst: jest.fn() } };
@@ -26,6 +26,7 @@ function fakeStorage(
     getDownloadUrl: jest
       .fn()
       .mockResolvedValue('file:///tmp/uploads/org-1/abc-photo.png'),
+    download: jest.fn().mockResolvedValue(Buffer.from('')),
     ...overrides,
   };
 }

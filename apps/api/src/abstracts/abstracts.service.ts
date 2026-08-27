@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@operant-event/database';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { validateAbstractFormData } from '../conference-form-fields/abstract-form-validator';
 import { validateAuthorFlags } from './abstract-authors.util';
@@ -227,6 +227,7 @@ export class AbstractsService {
 
   /** §20 trigger: "Abstract submitted". No-ops silently if the conference has since been deleted. */
   private async emitAbstractSubmitted(abstract: {
+    id: string;
     conferenceId: string;
     submittedBy: string;
     title: string;
@@ -243,6 +244,8 @@ export class AbstractsService {
       conferenceId: abstract.conferenceId,
       userId: abstract.submittedBy,
       templateData: { abstractTitle: abstract.title },
+      entityType: 'abstract',
+      entityId: abstract.id,
     });
   }
 

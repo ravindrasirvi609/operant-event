@@ -7,7 +7,7 @@ import {
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { Env } from '@operant-event/config';
 import { ENV } from '../env/env.module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@operant-event/database';
 
 @Injectable()
 export class PrismaService

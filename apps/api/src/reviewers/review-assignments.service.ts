@@ -80,6 +80,7 @@ export class ReviewAssignmentsService {
       conferenceId,
       reviewerId,
       abstract.title,
+      assignment.id,
     );
     return assignment;
   }
@@ -139,6 +140,7 @@ export class ReviewAssignmentsService {
         oldAssignment.conferenceId,
         newReviewerId,
         abstract.title,
+        newAssignment.id,
       );
     }
 
@@ -151,6 +153,7 @@ export class ReviewAssignmentsService {
     conferenceId: string,
     reviewerId: string,
     abstractTitle: string,
+    assignmentId: string,
   ): Promise<void> {
     const reviewer = await this.prisma.reviewer.findUnique({
       where: { id: reviewerId },
@@ -164,6 +167,8 @@ export class ReviewAssignmentsService {
       conferenceId,
       userId: reviewer.userId,
       templateData: { abstractTitle },
+      entityType: 'reviewAssignment',
+      entityId: assignmentId,
     });
   }
 

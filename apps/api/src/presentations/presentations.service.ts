@@ -8,6 +8,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { ScheduleConflictService } from '../sessions/schedule-conflict.service';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import type { AssignPresentationDto } from './dto/assign-presentation.dto';
+import type { UpdatePresentationDto } from './dto/update-presentation.dto';
 
 @Injectable()
 export class PresentationsService {
@@ -74,5 +75,80 @@ export class PresentationsService {
       }
       throw error;
     }
+  }
+
+  async findAllForSession(organizationId: string, sessionId: string) {
+    const session = await this.prisma.programSession.findFirst({
+      where: { id: sessionId, conference: { organizationId } },
+    });
+    if (!session) {
+      throw new NotFoundException('Session not found.');
+    }
+    return this.prisma.presentationAssignment.findMany({
+      where: { sessionId },
+      include: { abstract: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  async update(
+    organizationId: string,
+    presentationId: string,
+    dto: UpdatePresentationDto,
+  ) {
+    const presentation = await this.assertPresentationInOrganization(
+      organizationId,
+      presentationId,
+    );
+
+    const startTime = dto.startTime
+      ? new Date(dto.startTime)
+      : presentation.startTime;
+    const endTime = dto.endTime ? new Date(dto.endTime) : presentation.endTime;
+    this.scheduleConflictService.assertPresentationWithinSession(
+      presentation.session,
+      { startTime, endTime },
+    );
+    await this.scheduleConflictService.assertNoAbstractDoubleBooking(
+      presentation.abstractId,
+      presentation.sessionId,
+      { startTime, endTime },
+    );
+
+    return this.prisma.presentationAssignment.update({
+      where: { id: presentationId },
+      data: {
+        ...(dto.presentationType !== undefined && {
+          presentationType: dto.presentationType,
+        }),
+        ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
+        startTime,
+        endTime,
+      },
+    });
+  }
+
+  async remove(organizationId: string, presentationId: string) {
+    await this.assertPresentationInOrganization(organizationId, presentationId);
+    await this.prisma.presentationAssignment.delete({
+      where: { id: presentationId },
+    });
+  }
+
+  private async assertPresentationInOrganization(
+    organizationId: string,
+    presentationId: string,
+  ) {
+    const presentation = await this.prisma.presentationAssignment.findFirst({
+      where: {
+        id: presentationId,
+        session: { conference: { organizationId } },
+      },
+      include: { session: true },
+    });
+    if (!presentation) {
+      throw new NotFoundException('Presentation not found.');
+    }
+    return presentation;
   }
 }

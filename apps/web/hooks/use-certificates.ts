@@ -19,11 +19,22 @@ export function useGenerateCertificates(conferenceId: string) {
   });
 }
 
-/** Skips PDF rendering entirely and transitions straight to ISSUED — GENERATED is never produced by the backend today. */
+/** Transitions ELIGIBLE straight to ISSUED (GENERATED is never produced), rendering and attaching a real PDF (`fileId`) in the same call. */
 export function useIssueCertificate(conferenceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (certificateId: string) => apiPost<Certificate>(`certificates/${certificateId}/issue`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: certificatesInvalidationKey(conferenceId) });
+    },
+  });
+}
+
+/** Only valid from ISSUED — the backend 400s otherwise. There is no un-revoke endpoint. */
+export function useRevokeCertificate(conferenceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (certificateId: string) => apiPost<Certificate>(`certificates/${certificateId}/revoke`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: certificatesInvalidationKey(conferenceId) });
     },
