@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/use-notifications';
+import { Bell } from 'lucide-react';
 
 /**
  * Unread count is derived from `readAt === null` — never a
@@ -15,7 +16,7 @@ export function NotificationBell() {
 
   return (
     <Button variant="ghost" size="sm" render={<Link href="/notifications" />} className="relative">
-      Notifications
+      <Bell className="size-4" /> Notifications
       {unreadCount > 0 ? (
         <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs text-destructive-foreground">
           {unreadCount}

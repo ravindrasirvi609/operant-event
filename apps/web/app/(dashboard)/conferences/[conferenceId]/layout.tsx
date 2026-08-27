@@ -6,26 +6,22 @@ import { use } from 'react';
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { useConference } from '@/hooks/use-conferences';
 import { cn } from '@/lib/utils';
+import {
+  BarChart3, BookOpen, CalendarDays, CheckSquare, ClipboardList, FileInput, FileOutput, FormInput,
+  Handshake, LayoutDashboard, ListChecks, Mic2, Presentation, Receipt, ScanLine, Settings, ShieldCheck,
+  Ticket, Users, WalletCards,
+} from 'lucide-react';
 
 const TABS = [
-  { href: '', label: 'Overview' },
-  { href: '/settings', label: 'Settings' },
-  { href: '/tracks', label: 'Tracks' },
-  { href: '/form-builder', label: 'Form builder' },
-  { href: '/abstracts', label: 'Abstracts' },
-  { href: '/reviewers', label: 'Reviewers' },
-  { href: '/review-assignments', label: 'Review assignments' },
-  { href: '/registration-categories', label: 'Registration' },
-  { href: '/payments', label: 'Payments' },
-  { href: '/program', label: 'Program' },
-  { href: '/speakers', label: 'Speakers' },
-  { href: '/checkins', label: 'Check-ins' },
-  { href: '/certificates', label: 'Certificates' },
-  { href: '/sponsors', label: 'Sponsors' },
-  { href: '/exhibitors', label: 'Exhibitors' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/exports', label: 'Exports' },
-  { href: '/imports', label: 'Imports' },
+  { href: '', label: 'Overview', icon: LayoutDashboard }, { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/tracks', label: 'Tracks', icon: ListChecks }, { href: '/form-builder', label: 'Form builder', icon: FormInput },
+  { href: '/abstracts', label: 'Abstracts', icon: BookOpen }, { href: '/reviewers', label: 'Reviewers', icon: Users },
+  { href: '/review-assignments', label: 'Review assignments', icon: ClipboardList }, { href: '/registration-categories', label: 'Registration', icon: Ticket },
+  { href: '/payments', label: 'Payments', icon: WalletCards }, { href: '/program', label: 'Program', icon: Presentation },
+  { href: '/speakers', label: 'Speakers', icon: Mic2 }, { href: '/checkins', label: 'Check-ins', icon: ScanLine },
+  { href: '/certificates', label: 'Certificates', icon: ShieldCheck }, { href: '/sponsors', label: 'Sponsors', icon: Handshake },
+  { href: '/exhibitors', label: 'Exhibitors', icon: Users }, { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/exports', label: 'Exports', icon: FileOutput }, { href: '/imports', label: 'Imports', icon: FileInput },
 ];
 
 export default function ConferenceLayout({
@@ -58,12 +54,13 @@ export default function ConferenceLayout({
                   key={tab.href}
                   href={href}
                   className={cn(
-                    'border-b-2 px-1 pb-2 text-sm',
+                    'inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-1 pb-2 text-sm',
                     isActive
                       ? 'border-foreground font-medium text-foreground'
                       : 'border-transparent text-muted-foreground hover:text-foreground',
                   )}
                 >
+                  <tab.icon className="size-4" />
                   {tab.label}
                 </Link>
               );

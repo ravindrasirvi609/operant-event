@@ -8,6 +8,7 @@ import { AsyncBoundary } from '@/components/query/async-boundary';
 import { useActiveOrganization } from '@/hooks/use-active-organization';
 import { useConferences } from '@/hooks/use-conferences';
 import { useOrganizations } from '@/hooks/use-organizations';
+import { Building2, CalendarPlus } from 'lucide-react';
 
 export default function DashboardHomePage() {
   const organizationsQuery = useOrganizations();
@@ -29,7 +30,7 @@ export default function DashboardHomePage() {
           <p className="text-sm text-muted-foreground">
             You are not a member of any organization yet. Create one to get started.
           </p>
-          <Button render={<Link href="/organizations/new" />}>Create an organization</Button>
+          <Button render={<Link href="/organizations/new" />}><Building2 className="size-4" /> Create an organization</Button>
         </div>
       }
     >
@@ -40,7 +41,7 @@ export default function DashboardHomePage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-semibold">Conferences</h1>
-              <Button render={<Link href="/conferences/new" />}>New conference</Button>
+              <Button render={<Link href="/conferences/new" />}><CalendarPlus className="size-4" /> New conference</Button>
             </div>
             <AsyncBoundary
               query={conferencesQuery}
