@@ -13,6 +13,8 @@ const TABS = [
   { href: '/tracks', label: 'Tracks' },
   { href: '/form-builder', label: 'Form builder' },
   { href: '/abstracts', label: 'Abstracts' },
+  { href: '/reviewers', label: 'Reviewers' },
+  { href: '/review-assignments', label: 'Review assignments' },
 ];
 
 export default function ConferenceLayout({

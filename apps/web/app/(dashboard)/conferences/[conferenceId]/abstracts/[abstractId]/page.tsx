@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { use } from 'react';
 import { AbstractStatusBadge } from '@/components/abstracts/abstract-status-badge';
 import { ForceSubmitButton } from '@/components/abstracts/force-submit-button';
+import { Button } from '@/components/ui/button';
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { useOrganizerAbstract } from '@/hooks/use-organizer-abstracts';
 
@@ -38,9 +40,12 @@ export default function OrganizerAbstractDetailPage({
               <dt className="text-muted-foreground">Submitted at</dt>
               <dd>{a.submittedAt ? new Date(a.submittedAt).toLocaleString() : 'Not yet submitted'}</dd>
             </dl>
-            {a.status === 'DRAFT' ? (
-              <ForceSubmitButton conferenceId={conferenceId} abstractId={a.id} />
-            ) : null}
+            <div className="flex gap-2">
+              {a.status === 'DRAFT' ? <ForceSubmitButton conferenceId={conferenceId} abstractId={a.id} /> : null}
+              <Button variant="outline" size="sm" render={<Link href={`/conferences/${conferenceId}/abstracts/${a.id}/decision`} />}>
+                Record decision
+              </Button>
+            </div>
           </div>
         );
       }}
