@@ -206,6 +206,14 @@ export class AuthService {
       where: { id: record.userId },
       data: { passwordHash },
     });
+    // Completing the password setup accepts organization invitations for
+    // this user. Without this transition, organizations/me intentionally
+    // hides the INVITED membership and the dashboard incorrectly offers to
+    // create a new organization.
+    await this.prisma.organizationMembership.updateMany({
+      where: { userId: record.userId, status: 'INVITED' },
+      data: { status: 'ACTIVE', joinedAt: new Date() },
+    });
     await this.prisma.passwordResetToken.update({
       where: { id: record.id },
       data: { usedAt: new Date() },
