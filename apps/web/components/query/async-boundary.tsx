@@ -11,6 +11,8 @@ interface AsyncBoundaryProps<T> {
   empty?: ReactNode;
   /** Defaults to "data is an array with length 0" — override for non-array shapes. */
   isEmpty?: (data: T) => boolean;
+  /** Rendered while the query is pending — defaults to a plain "Loading…" status line. */
+  loading?: ReactNode;
 }
 
 /**
@@ -18,12 +20,14 @@ interface AsyncBoundaryProps<T> {
  * from (SRS §41 DoD: "UI handles loading, empty, validation, error and
  * success states") — no page hand-rolls its own three-state branch.
  */
-export function AsyncBoundary<T>({ query, children, empty, isEmpty }: AsyncBoundaryProps<T>) {
+export function AsyncBoundary<T>({ query, children, empty, isEmpty, loading }: AsyncBoundaryProps<T>) {
   if (query.isPending) {
     return (
-      <div role="status" aria-live="polite" className="flex items-center justify-center p-8 text-sm text-muted-foreground">
-        Loading…
-      </div>
+      loading ?? (
+        <div role="status" aria-live="polite" className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+          Loading…
+        </div>
+      )
     );
   }
 

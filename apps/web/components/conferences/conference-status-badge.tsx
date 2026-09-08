@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import type { ConferenceStatus } from '@/lib/conferences/types';
 
-const STATUS_LABELS: Record<ConferenceStatus, string> = {
+export const STATUS_LABELS: Record<ConferenceStatus, string> = {
   DRAFT: 'Draft',
   OPEN: 'Open for submissions',
   REVIEW: 'Under review',
