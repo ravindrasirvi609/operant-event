@@ -28,7 +28,12 @@ export default function RegistrationPage({ params }: { params: Promise<{ registr
             <dd>{new Date(registration.registeredAt).toLocaleString()}</dd>
           </dl>
           {registration.status === 'PENDING' ? (
-            <Button render={<Link href={`/registrations/${registration.id}/checkout`} />}>Pay now</Button>
+            <Button
+              nativeButton={false}
+              render={<Link href={`/registrations/${registration.id}/checkout`} />}
+            >
+              Pay now
+            </Button>
           ) : null}
         </div>
       )}
