@@ -1,0 +1,139 @@
+ubuntu@ip-172-31-35-30:~/operant-event$ cat ~/deploy-operant-event.sh#!/usr/bin/env bash
+set -euo pipefail
+
+cd /home/ubuntu/operant-event
+
+echo "Pulling latest code..."
+git fetch origin main
+git reset --hard origin/main
+
+echo "Installing dependencies..."
+corepack enable
+corepack prepare pnpm@11.23.0 --activate
+pnpm install --frozen-lockfile
+
+echo "Running database migrations..."
+set -a
+source apps/api/.env
+set +a
+
+pnpm --filter api exec prisma migrate deploy
+
+echo "Building shared packages..."
+pnpm --filter @operant-event/config build
+pnpm --filter @operant-event/database build
+pnpm --filter @operant-event/storage build
+
+echo "Building API and worker..."
+pnpm --filter api build
+pnpm --filter worker build
+
+echo "Restarting services..."
+pm2 restart operant-api --update-env
+pm2 restart operant-worker --update-env
+pm2 save
+
+echo "Checking PM2 status..."
+pm2 status
+
+echo "Deployment completed."
+
+
+
+ubuntu@ip-172-31-35-30:~/operant-event$ echo "Installing dependencies..."
+Installing dependencies...
+ubuntu@ip-172-31-35-30:~/operant-event$ export PATH="$HOME/.local/bin:$PATH"
+ubuntu@ip-172-31-35-30:~/operant-event$ npm install --global --prefix "$HOME/.local" pnpm@11.23.0
+
+added 1 package in 3s
+
+1 package is looking for funding
+  run `npm fund` for details
+ubuntu@ip-172-31-35-30:~/operant-event$ pnpm install --frozen-lockfile
+Scope: all 7 workspace projects
+Already up to date
+
+   ╭─────────────────────────────────────────╮
+   │                                         │
+   │   Update available! 11.23.0 → 12.6.0.   │
+   │   Changelog: https://pnpm.io/v/12.6.0   │
+   │    To update, run: pnpm add -g pnpm     │
+   │                                         │
+   ╰─────────────────────────────────────────╯
+
+Done in 896ms using pnpm v11.23.0
+ubuntu@ip-172-31-35-30:~/operant-event$ corepack enable
+ubuntu@ip-172-31-35-30:~/operant-event$ corepack prepare pnpm@11.23.0 --activate
+Preparing pnpm@11.23.0 for immediate activation...
+ubuntu@ip-172-31-35-30:~/operant-event$ pnpm install --frozen-lockfile
+Scope: all 7 workspace projects
+Already up to date
+Done in 695ms using pnpm v11.23.0
+ubuntu@ip-172-31-35-30:~/operant-event$ chmod +x ~/deploy-operant-event.sh
+ubuntu@ip-172-31-35-30:~/operant-event$ ~/deploy-operant-event.sh
+Pulling latest code...
+From https://github.com/ravindrasirvi609/operant-event
+ * branch            main       -> FETCH_HEAD
+HEAD is now at 2a07670 feat: add Corepack installation step to deployment script for compatibility
+Installing dependencies...
+Preparing pnpm@11.23.0 for immediate activation...
+Scope: all 7 workspace projects
+Already up to date
+Done in 651ms using pnpm v11.23.0
+Running database migrations...
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from ../../packages/database/prisma/schema.prisma.
+Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-0-ap-northeast-1.pooler.supabase.com:5432"
+
+1 migration found in prisma/migrations
+
+
+No pending migrations to apply.
+Building shared packages...
+$ tsc -p tsconfig.json
+$ prisma generate && tsc -p tsconfig.json
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (v7.9.1) to ./../../node_modules/.pnpm/@prisma+client@7.9.1_prisma@7.9.1_@types+react-dom@19.2.4_@types+react@19.2.18__@types+_7b98b6f88391e1939201dcf2048e6b10/node_modules/@prisma/client in 1.23s
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+$ tsc -p tsconfig.json
+Building API and worker...
+$ nest build
+$ tsc -p tsconfig.json
+Restarting services...
+[PM2] Applying action restartProcessId on app [operant-api](ids: [ 0…
+[PM2] [operant-api](0) ✓
+┌────┬────────────────┬───────────┬────────┬──────────┐
+│ id │ name           │ status    │ cpu    │ mem      │
+├────┼────────────────┼───────────┼────────┼──────────┤
+│ 0  │ operant-api    │ online    │ 0%     │ 49.6mb   │
+│ 1  │ operant-worker │ online    │ 0%     │ 28.3mb   │
+└────┴────────────────┴───────────┴────────┴──────────┘
+host metrics | cpu: 47.2% | ram usage: 55.5% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | ens5: ⇓ 0.002mb/s ⇑ 0.002mb/s
+[PM2] Applying action restartProcessId on app [operant-worker](ids: …
+[PM2] [operant-worker](1) ✓
+┌────┬────────────────┬───────────┬────────┬──────────┐
+│ id │ name           │ status    │ cpu    │ mem      │
+├────┼────────────────┼───────────┼────────┼──────────┤
+│ 0  │ operant-api    │ online    │ 43.8%  │ 74.2mb   │
+│ 1  │ operant-worker │ online    │ 0%     │ 26.9mb   │
+└────┴────────────────┴───────────┴────────┴──────────┘
+host metrics | cpu: 47.2% | ram usage: 55.5% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | ens5: ⇓ 0.002mb/s ⇑ 0.002mb/s
+[PM2] Saving current process list...
+[PM2] Successfully saved in /home/ubuntu/.pm2/dump.pm2
+Checking PM2 status...
+┌────┬────────────────┬───────────┬────────┬──────────┐
+│ id │ name           │ status    │ cpu    │ mem      │
+├────┼────────────────┼───────────┼────────┼──────────┤
+│ 0  │ operant-api    │ online    │ 0%     │ 82.9mb   │
+│ 1  │ operant-worker │ online    │ 100%   │ 72.1mb   │
+└────┴────────────────┴───────────┴────────┴──────────┘
+host metrics | cpu: 47.2% | ram usage: 55.5% | lo: ⇓ 0.001mb/s ⇑ 0.001mb/s | ens5: ⇓ 0.002mb/s ⇑ 0.002mb/s
+Deployment completed.
+ubuntu@ip-172-31-35-30:~/operant-event$ 
