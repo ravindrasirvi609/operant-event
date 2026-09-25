@@ -12,11 +12,24 @@ function subscribe(): () => void {
   return () => {};
 }
 
+// `useSyncExternalStore` compares snapshots with Object.is. Parsing the same
+// sessionStorage value on every read creates a new object each time, which
+// makes React think the store changed forever. Keep one stable snapshot per
+// registration for the lifetime of this client module.
+const snapshots = new Map<string, CreateOrderResult | null>();
+
+function getSnapshot(registrationId: string): CreateOrderResult | null {
+  if (!snapshots.has(registrationId)) {
+    snapshots.set(registrationId, readCachedOrderResult(registrationId));
+  }
+  return snapshots.get(registrationId) ?? null;
+}
+
 /** Reads the sessionStorage order cache as an external store — SSR-safe, no effect needed for the initial read. */
 export function useCachedOrderResult(registrationId: string): CreateOrderResult | null {
   return useSyncExternalStore(
     subscribe,
-    () => readCachedOrderResult(registrationId),
+    () => getSnapshot(registrationId),
     () => null,
   );
 }

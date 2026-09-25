@@ -95,4 +95,14 @@ export class FilesService {
     }
     return this.storage.getDownloadUrl(file.storageKey);
   }
+
+  async downloadForOrganization(organizationId: string, fileId: string) {
+    const file = await this.prisma.file.findFirst({
+      where: { id: fileId, organizationId },
+    });
+    if (!file) {
+      throw new NotFoundException('File not found.');
+    }
+    return { file, buffer: await this.storage.download(file.storageKey) };
+  }
 }

@@ -5,6 +5,8 @@ import {
   Param,
   Post,
   UploadedFile,
+  Res,
+  StreamableFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -17,6 +19,7 @@ import {
   type AuthenticatedUser,
 } from '../common/decorators/current-user.decorator';
 import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
+import type { Response } from 'express';
 
 @Controller('files')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -49,6 +52,17 @@ export class FilesController {
     return this.filesService
       .getDownloadUrl(organizationId, id)
       .then((url) => ({ url }));
+  }
+
+  @Get(':id/download')
+  async download(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { file, buffer } = await this.filesService.downloadForOrganization(organizationId, id);
+    response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    return new StreamableFile(buffer, { type: file.mimeType });
   }
 }
 
