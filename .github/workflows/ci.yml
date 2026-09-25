@@ -38,11 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Prisma generates TypeScript types into node_modules at runtime.
-      # Lint and typecheck both need those types, so generate before either runs.
-      - name: Generate Prisma client
-        run: pnpm --filter @operant-event/database run generate
-
       - name: Lint
         run: pnpm lint
 

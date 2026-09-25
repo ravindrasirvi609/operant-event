@@ -327,7 +327,7 @@ export class AbstractsService {
     return abstract;
   }
 
-  private async activeFormFields(conferenceId: string) {
+  private activeFormFields(conferenceId: string) {
     return this.prisma.conferenceFormField.findMany({
       where: { conferenceId, status: 'ACTIVE' },
     });
