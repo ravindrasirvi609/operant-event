@@ -1,9 +1,12 @@
 name: Deploy Production
 
+# Trigger only after the CI workflow completes successfully on main.
+# This ensures broken builds never reach production.
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
 
 concurrency:
   group: production-deployment
@@ -13,6 +16,8 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
+    # Skip if CI did not pass (e.g. failed or was cancelled).
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Deploy over SSH

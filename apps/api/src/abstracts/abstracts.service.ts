@@ -57,7 +57,7 @@ export class AbstractsService {
     });
   }
 
-  async findMine(submittedBy: string) {
+  findMine(submittedBy: string) {
     return this.prisma.abstract.findMany({ where: { submittedBy } });
   }
 
