@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarPlus, Rocket, Search, X } from 'lucide-react';
+import { Building2, CalendarPlus, Rocket, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -152,12 +152,13 @@ export default function DashboardHomePage() {
     <AsyncBoundary
       query={organizationsQuery}
       empty={
-        <EmptyState
-          icon={Rocket}
-          title="Welcome to Operant Event"
-          description="You are not a member of any organization yet. Create one to get started."
-          action={<Button render={<Link href="/organizations/new" />}>Create an organization</Button>}
-        />
+        <div className="space-y-3">
+          <h1 className="text-xl font-semibold">Welcome to Operant Event</h1>
+          <p className="text-sm text-muted-foreground">
+            You are not a member of any organization yet. Create one to get started.
+          </p>
+          <Button render={<Link href="/organizations/new" />}><Building2 className="size-4" /> Create an organization</Button>
+        </div>
       }
     >
       {() =>
@@ -199,3 +200,4 @@ export default function DashboardHomePage() {
     </AsyncBoundary>
   );
 }
+

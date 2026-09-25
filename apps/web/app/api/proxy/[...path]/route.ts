@@ -55,7 +55,9 @@ async function handle(request: NextRequest, { params }: RouteContext): Promise<N
     responseHeaders.set('content-disposition', contentDisposition);
   }
 
-  const responseBody = await backendResponse.arrayBuffer();
+  // A 204 response must not have a body. Passing even an empty ArrayBuffer
+  // to NextResponse causes the Web Response constructor to reject the 204.
+  const responseBody = backendResponse.status === 204 ? null : await backendResponse.arrayBuffer();
   const response = new NextResponse(responseBody, {
     status: backendResponse.status,
     headers: responseHeaders,

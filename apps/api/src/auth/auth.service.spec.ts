@@ -32,6 +32,9 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
       findFirst: jest.fn(),
       update: jest.fn(),
     },
+    organizationMembership: {
+      updateMany: jest.fn(),
+    },
     session: {
       create: jest.fn(),
       findFirst: jest.fn(),
