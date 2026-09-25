@@ -27,4 +27,11 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Some Node.js distributions no longer ship Corepack. The remote
+            # deployment script uses it to activate the pnpm version pinned in
+            # package.json, so install it when the host does not provide it.
+            if ! command -v corepack >/dev/null 2>&1; then
+              npm install --global --prefix "$HOME/.local" corepack@0.31.0
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
             /home/ubuntu/deploy-operant-event.sh
