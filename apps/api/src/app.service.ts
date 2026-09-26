@@ -5,4 +5,12 @@ export class AppService {
   getHello(): string {
     return 'Hello World!';
   }
+
+  getHealth() {
+    return {
+      status: 'ok',
+      service: 'operant-event-api',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
