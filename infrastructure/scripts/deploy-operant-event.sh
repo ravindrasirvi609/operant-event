@@ -2,9 +2,25 @@
 # Deploy script for operant-event on EC2.
 # Managed in git — do not edit the copy on the server directly.
 # The CI/CD workflow (deploy.yml) copies this file to the server before running it.
+
 set -euo pipefail
 
+# Load NVM for non-interactive SSH sessions
+export NVM_DIR="$HOME/.nvm"
+
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  source "$NVM_DIR/nvm.sh"
+fi
+
+nvm use 22
+
 cd /home/ubuntu/operant-event
+
+echo "Node version:"
+node -v
+
+echo "npm version:"
+npm -v
 
 echo "Pulling latest code..."
 git fetch origin main
@@ -17,6 +33,7 @@ if ! command -v corepack >/dev/null 2>&1; then
   npm install --global --prefix "$HOME/.local" corepack@0.31.0
   export PATH="$HOME/.local/bin:$PATH"
 fi
+
 corepack enable
 corepack prepare pnpm@11.23.0 --activate
 
@@ -28,6 +45,7 @@ set -a
 # shellcheck source=apps/api/.env
 source apps/api/.env
 set +a
+
 pnpm --filter api exec prisma migrate deploy
 
 echo "Building shared packages..."
@@ -40,7 +58,7 @@ pnpm --filter api build
 pnpm --filter worker build
 
 echo "Restarting services..."
-pm2 restart operant-api  --update-env
+pm2 restart operant-api --update-env
 pm2 restart operant-worker --update-env
 pm2 save
 
