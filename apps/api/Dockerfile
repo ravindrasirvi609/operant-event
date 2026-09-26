@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:24-slim AS base
+FROM node:22-slim AS base
 RUN corepack enable
 
 # ---- Prune the monorepo down to only what `api` needs to build ----
@@ -32,5 +32,5 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=apiuser:nodejs /app .
 USER apiuser
 WORKDIR /app/apps/api
-EXPOSE 3000
+EXPOSE 3001
 CMD ["node", "dist/main.js"]

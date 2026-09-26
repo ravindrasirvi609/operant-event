@@ -23,14 +23,18 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Operant Event API')
-    .setDescription('Multi-tenant conference & event management SaaS API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/v1/docs', app, swaggerDocument);
+  // Swagger is only mounted outside production — exposing the full API
+  // schema in prod leaks endpoint shapes and is an unnecessary attack surface.
+  if (env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Operant Event API')
+      .setDescription('Multi-tenant conference & event management SaaS API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/v1/docs', app, swaggerDocument);
+  }
 
   await app.listen(env.PORT);
 }

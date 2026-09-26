@@ -7,6 +7,14 @@ const validBase = {
   JWT_REFRESH_SECRET: 'b'.repeat(32),
 };
 
+// A realistic production environment — distinct, non-placeholder secrets.
+const prodBase = {
+  ...validBase,
+  NODE_ENV: 'production' as const,
+  JWT_ACCESS_SECRET: 'prod-access-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+  JWT_REFRESH_SECRET: 'prod-refresh-secret-yyyyyyyyyyyyyyyyyyyyyyyyyyyy',
+};
+
 describe('loadEnv', () => {
   it('parses a complete, valid environment', () => {
     const env = loadEnv(validBase);
@@ -107,5 +115,87 @@ describe('loadEnv', () => {
       FRONTEND_URL: 'https://app.example.com',
     });
     expect(env.FRONTEND_URL).toBe('https://app.example.com');
+  });
+});
+
+describe('NODE_ENV', () => {
+  it('defaults to "development" when not set', () => {
+    const env = loadEnv(validBase);
+    expect(env.NODE_ENV).toBe('development');
+  });
+
+  it('accepts "production"', () => {
+    const env = loadEnv(prodBase);
+    expect(env.NODE_ENV).toBe('production');
+  });
+
+  it('accepts "test"', () => {
+    const env = loadEnv({ ...validBase, NODE_ENV: 'test' });
+    expect(env.NODE_ENV).toBe('test');
+  });
+
+  it('rejects an unknown NODE_ENV value', () => {
+    expect(() => loadEnv({ ...validBase, NODE_ENV: 'staging' })).toThrow(
+      /NODE_ENV/,
+    );
+  });
+});
+
+describe('production JWT secret validation', () => {
+  it('accepts distinct non-placeholder secrets in production', () => {
+    expect(() => loadEnv(prodBase)).not.toThrow();
+  });
+
+  it('rejects the .env.example JWT_ACCESS_SECRET placeholder in production', () => {
+    expect(() =>
+      loadEnv({
+        ...prodBase,
+        JWT_ACCESS_SECRET: 'dev-access-secret-change-me-0123456789abcdef',
+      }),
+    ).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('rejects the .env.example JWT_REFRESH_SECRET placeholder in production', () => {
+    expect(() =>
+      loadEnv({
+        ...prodBase,
+        JWT_REFRESH_SECRET: 'dev-refresh-secret-change-me-0123456789abcdef',
+      }),
+    ).toThrow(/JWT_REFRESH_SECRET/);
+  });
+
+  it('rejects any secret containing "change-me" in production', () => {
+    expect(() =>
+      loadEnv({ ...prodBase, JWT_ACCESS_SECRET: 'some-change-me-value-x'.repeat(2) }),
+    ).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('rejects any secret starting with "dev-" in production', () => {
+    expect(() =>
+      loadEnv({ ...prodBase, JWT_ACCESS_SECRET: 'dev-something-long-enough-here-xx' }),
+    ).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('rejects identical ACCESS and REFRESH secrets in production', () => {
+    const sameSecret = 'prod-identical-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxx';
+    expect(() =>
+      loadEnv({
+        ...prodBase,
+        JWT_ACCESS_SECRET: sameSecret,
+        JWT_REFRESH_SECRET: sameSecret,
+      }),
+    ).toThrow(/JWT_REFRESH_SECRET/);
+  });
+
+  it('does NOT enforce placeholder rules in development', () => {
+    // dev placeholder values are fine in dev/test — they should not trip the guard
+    expect(() =>
+      loadEnv({
+        ...validBase,
+        NODE_ENV: 'development',
+        JWT_ACCESS_SECRET: 'dev-access-secret-change-me-0123456789abcdef',
+        JWT_REFRESH_SECRET: 'dev-refresh-secret-change-me-0123456789abcdef',
+      }),
+    ).not.toThrow();
   });
 });

@@ -2,6 +2,9 @@
   "name": "@operant-event/database",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
@@ -9,7 +12,9 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "db:push": "prisma db push"
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push --comment 'LOCAL DEV ONLY — use migrate:dev for changes that need to be deployed; see MIGRATIONS.md'"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

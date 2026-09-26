@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:24-slim AS base
+FROM node:22-slim AS base
 RUN corepack enable
 
 # ---- Prune the monorepo down to only what `worker` needs to build ----
