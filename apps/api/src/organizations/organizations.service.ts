@@ -25,16 +25,20 @@ export class OrganizationsService {
     @Inject(AUTH_MAILER) private readonly mailer: AuthMailer,
   ) {}
 
-  async create(ownerUserId: string, dto: CreateOrganizationDto) {
+  /**
+   * Creates a new organization and provisions its first Organization Owner.
+   *
+   * Called exclusively by SuperAdmin-gated routes. The caller supplies the
+   * intended owner's email and name; if no account exists for that email, one
+   * is created with INVITED status and a set-password email is dispatched so
+   * the owner can activate their account. If an account already exists, they
+   * are simply added as Organization Owner of the new org.
+   *
+   * All DB writes run inside a single transaction to keep the org, owner, and
+   * membership consistent even on partial failure.
+   */
+  async create(dto: CreateOrganizationDto) {
     const slug = slugify(dto.slug ?? dto.name);
-    const existing = await this.prisma.organization.findUnique({
-      where: { slug },
-    });
-    if (existing) {
-      throw new ConflictException(
-        `An organization with slug "${slug}" already exists.`,
-      );
-    }
 
     // Not findUnique on the compound (organizationId, name) index: Postgres
     // never treats two NULLs as equal, even under a unique constraint, so
@@ -49,25 +53,85 @@ export class OrganizationsService {
       );
     }
 
-    const organization = await this.prisma.organization.create({
-      data: {
-        name: dto.name,
-        slug,
-        contactEmail: dto.contactEmail,
-        contactPhone: dto.contactPhone,
-        website: dto.website,
-      },
+    // Check whether the designated owner already has an account before we
+    // enter the transaction, so we know whether to send an invite after commit.
+    const existingOwner = await this.prisma.user.findUnique({
+      where: { email: dto.ownerEmail },
+      select: { id: true },
     });
 
-    await this.prisma.organizationMembership.create({
-      data: {
-        organizationId: organization.id,
-        userId: ownerUserId,
-        status: 'ACTIVE',
-        joinedAt: new Date(),
-        roles: { create: { roleId: ownerRole.id } },
-      },
+    let newOwnerCreated = false;
+    let inviteToken: string | undefined;
+
+    const organization = await this.prisma.$transaction(async (tx) => {
+      // Guard slug uniqueness inside the transaction.
+      const slugTaken = await tx.organization.findUnique({ where: { slug } });
+      if (slugTaken) {
+        throw new ConflictException(
+          `An organization with slug "${slug}" already exists.`,
+        );
+      }
+
+      let ownerId: string;
+      if (!existingOwner) {
+        // Create a stub account; the owner will set their password via the
+        // token we issue below (same "invite by email" pattern as inviteMember).
+        const newUser = await tx.user.create({
+          data: {
+            email: dto.ownerEmail,
+            firstName: dto.ownerFirstName,
+            lastName: dto.ownerLastName,
+            passwordHash: this.unusablePasswordHash(),
+            status: 'INVITED',
+          },
+        });
+        ownerId = newUser.id;
+        newOwnerCreated = true;
+
+        const { token, tokenHash } = this.tokenService.issueRefreshToken();
+        inviteToken = token;
+        await tx.passwordResetToken.create({
+          data: {
+            userId: ownerId,
+            tokenHash,
+            expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+          },
+        });
+      } else {
+        ownerId = existingOwner.id;
+      }
+
+      const org = await tx.organization.create({
+        data: {
+          name: dto.name,
+          slug,
+          contactEmail: dto.contactEmail,
+          contactPhone: dto.contactPhone,
+          website: dto.website,
+        },
+      });
+
+      await tx.organizationMembership.create({
+        data: {
+          organizationId: org.id,
+          userId: ownerId,
+          status: 'ACTIVE',
+          joinedAt: new Date(),
+          roles: { create: { roleId: ownerRole.id } },
+        },
+      });
+
+      return org;
     });
+
+    // Send invite after the transaction commits so a mailer failure doesn't
+    // roll back the already-created org.
+    if (newOwnerCreated && inviteToken) {
+      await this.mailer.sendPasswordReset(
+        { email: dto.ownerEmail, firstName: dto.ownerFirstName },
+        inviteToken,
+      );
+    }
 
     return organization;
   }

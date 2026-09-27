@@ -11,6 +11,7 @@ import { STATUS_LABELS } from '@/components/conferences/conference-status-badge'
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { useActiveOrganization } from '@/hooks/use-active-organization';
 import { useConferences } from '@/hooks/use-conferences';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { useOrganizations } from '@/hooks/use-organizations';
 import { CONFERENCE_STATUSES, type Conference, type ConferenceStatus } from '@/lib/conferences/types';
 
@@ -141,6 +142,7 @@ export default function DashboardHomePage() {
   const organizationsQuery = useOrganizations();
   const { activeOrgId, setActiveOrganization } = useActiveOrganization();
   const conferencesQuery = useConferences();
+  const { data: currentUser } = useCurrentUser();
 
   useEffect(() => {
     if (!activeOrgId && organizationsQuery.data && organizationsQuery.data.length > 0) {
@@ -154,10 +156,21 @@ export default function DashboardHomePage() {
       empty={
         <div className="space-y-3">
           <h1 className="text-xl font-semibold">Welcome to Operant Event</h1>
-          <p className="text-sm text-muted-foreground">
-            You are not a member of any organization yet. Create one to get started.
-          </p>
-          <Button render={<Link href="/organizations/new" />}><Building2 className="size-4" /> Create an organization</Button>
+          {currentUser?.isSuperAdmin ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                No organizations yet. As a Super Admin you can provision the first one.
+              </p>
+              <Button render={<Link href="/organizations/new" />}>
+                <Building2 className="size-4" /> Create an organization
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              You haven&apos;t been added to any organization yet. Ask your organization
+              administrator for an invitation.
+            </p>
+          )}
         </div>
       }
     >

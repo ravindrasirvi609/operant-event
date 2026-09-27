@@ -67,6 +67,14 @@ export class AuthController {
     return this.authService.confirmPasswordReset(dto);
   }
 
+  /** Returns the authenticated user's profile, including the `isSuperAdmin`
+   *  flag that the frontend uses to show/hide platform-admin UI. */
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getProfile(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getProfile(user.id);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('sessions')
   listSessions(@CurrentUser() user: AuthenticatedUser) {

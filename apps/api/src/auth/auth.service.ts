@@ -238,6 +238,21 @@ export class AuthService {
     });
   }
 
+  /** Returns the current user's profile including their platform Super Admin flag.
+   *  Used by the frontend to conditionally show organization-management UI. */
+  async getProfile(userId: string) {
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isSuperAdmin: true,
+      },
+    });
+  }
+
   async revokeSession(userId: string, sessionId: string): Promise<void> {
     const result = await this.prisma.session.updateMany({
       where: { id: sessionId, userId },

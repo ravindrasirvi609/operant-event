@@ -94,6 +94,7 @@ model User {
   status             UserStatus               @default(INVITED)
   emailVerifiedAt    DateTime?
   lastLoginAt        DateTime?
+  isSuperAdmin       Boolean                  @default(false)
   memberships        OrganizationMembership[]
   sessions           Session[]
   passwordResets     PasswordResetToken[]

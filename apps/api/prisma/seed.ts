@@ -1,3 +1,4 @@
+import * as bcrypt from 'bcrypt';
 import { PrismaClient } from '@operant-event/database';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { loadEnv } from '@operant-event/config';
@@ -62,6 +63,31 @@ async function main(): Promise<void> {
         });
       }
       console.log(`Seeded system role "${roleDefinition.name}" with ${permissionIds.length} permissions.`);
+    }
+    // ── Super Admin bootstrap ──────────────────────────────────────────────────
+    // Set SUPER_ADMIN_EMAIL + SUPER_ADMIN_PASSWORD in the environment to mint
+    // (or promote) the platform Super Admin on first seed. Safe to re-run:
+    // upsert promotes an existing account but never creates a duplicate.
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
+    const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+    if (superAdminEmail && superAdminPassword) {
+      const passwordHash = await bcrypt.hash(superAdminPassword, env.BCRYPT_SALT_ROUNDS);
+      await prisma.user.upsert({
+        where: { email: superAdminEmail },
+        update: { isSuperAdmin: true },
+        create: {
+          email: superAdminEmail,
+          firstName: 'Platform',
+          lastName: 'Admin',
+          passwordHash,
+          status: 'ACTIVE',
+          isSuperAdmin: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      console.log(`Super Admin bootstrapped: ${superAdminEmail}`);
+    } else {
+      console.log('SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set — skipping Super Admin bootstrap.');
     }
   } finally {
     await prisma.$disconnect();

@@ -14,6 +14,7 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import {
   CurrentUser,
@@ -28,13 +29,14 @@ import { assertMatchingOrganizationId } from '../common/utils/assert-matching-or
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
-  @UseGuards(JwtAuthGuard)
+  /** Only a platform Super Admin may create a new organization. The caller
+   *  supplies the intended owner's email + name; the service will create the
+   *  owner account (with INVITED status) if one does not already exist and
+   *  will dispatch a set-password email. */
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @Post()
-  create(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: CreateOrganizationDto,
-  ) {
-    return this.organizationsService.create(user.id, dto);
+  create(@Body() dto: CreateOrganizationDto) {
+    return this.organizationsService.create(dto);
   }
 
   @UseGuards(JwtAuthGuard)

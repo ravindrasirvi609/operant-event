@@ -14,7 +14,10 @@ const fakeEnv = {
 } as Env;
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
-  const base = {
+  // Cast to `any` for the base so TypeScript doesn't choke on $transaction
+  // having a different shape to the model sub-records.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const base: any = {
     organization: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -37,12 +40,16 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     },
     passwordResetToken: { create: jest.fn() },
   };
-  const baseRecord = base as unknown as Record<
-    string,
-    Record<string, jest.Mock>
-  >;
+  // $transaction passes `base` itself as the `tx` argument so model mocks are
+  // reachable inside the callback — mirrors how Prisma works in real code.
+  base.$transaction = jest.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(base));
+
   for (const [model, methods] of Object.entries(overrides)) {
-    Object.assign(baseRecord[model], methods);
+    if (typeof base[model] === 'object' && base[model] !== null) {
+      Object.assign(base[model], methods);
+    } else {
+      base[model] = methods;
+    }
   }
   return base as unknown as PrismaService;
 }
@@ -63,28 +70,30 @@ function buildService(
 }
 
 describe('OrganizationsService.create', () => {
-  it('creates the organization, an ACTIVE owner membership, and grants the Owner role', async () => {
-    const orgCreate = jest
-      .fn()
-      .mockResolvedValue({ id: 'org-1', name: 'APTICON', slug: 'apticon' });
-    const membershipCreate = jest
-      .fn()
-      .mockResolvedValue({ id: 'membership-1' });
-    const ownerRole = { id: 'role-owner', name: 'Organization Owner' };
+  const baseDto = {
+    name: 'APTICON',
+    ownerEmail: 'owner@example.com',
+    ownerFirstName: 'Alice',
+    ownerLastName: 'Owner',
+  };
+  const ownerRole = { id: 'role-owner', name: 'Organization Owner' };
+  const newOrg = { id: 'org-1', name: 'APTICON', slug: 'apticon' };
+
+  it('creates the org and ACTIVE owner membership when the owner already has an account', async () => {
+    const existingUser = { id: 'user-1' };
+    const orgCreate = jest.fn().mockResolvedValue(newOrg);
+    const membershipCreate = jest.fn().mockResolvedValue({ id: 'membership-1' });
+    const mailer = fakeMailer();
     const prisma = fakePrisma({
-      organization: {
-        findUnique: jest.fn().mockResolvedValue(null),
-        create: orgCreate,
-      },
-      organizationMembership: { create: membershipCreate },
       role: { findFirst: jest.fn().mockResolvedValue(ownerRole) },
+      user: { findUnique: jest.fn().mockResolvedValue(existingUser) },
+      organization: { findUnique: jest.fn().mockResolvedValue(null), create: orgCreate },
+      organizationMembership: { create: membershipCreate },
     });
 
-    const result = await buildService(prisma).create('user-1', {
-      name: 'APTICON',
-    });
+    const result = await buildService(prisma, mailer).create(baseDto);
 
-    expect(result).toEqual({ id: 'org-1', name: 'APTICON', slug: 'apticon' });
+    expect(result).toEqual(newOrg);
     expect(orgCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ name: 'APTICON', slug: 'apticon' }),
     });
@@ -97,26 +106,53 @@ describe('OrganizationsService.create', () => {
         roles: { create: { roleId: 'role-owner' } },
       },
     });
+    // No invite email for an already-existing owner.
+    expect(mailer.sendPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('creates a new owner account and sends a set-password invite when owner has no account', async () => {
+    const orgCreate = jest.fn().mockResolvedValue(newOrg);
+    const membershipCreate = jest.fn().mockResolvedValue({ id: 'membership-1' });
+    const userCreate = jest.fn().mockResolvedValue({ id: 'user-new', email: 'owner@example.com' });
+    const tokenCreate = jest.fn().mockResolvedValue(undefined);
+    const mailer = fakeMailer();
+    const prisma = fakePrisma({
+      role: { findFirst: jest.fn().mockResolvedValue(ownerRole) },
+      user: { findUnique: jest.fn().mockResolvedValue(null), create: userCreate },
+      organization: { findUnique: jest.fn().mockResolvedValue(null), create: orgCreate },
+      organizationMembership: { create: membershipCreate },
+      passwordResetToken: { create: tokenCreate },
+    });
+
+    await buildService(prisma, mailer).create(baseDto);
+
+    expect(userCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'owner@example.com',
+          firstName: 'Alice',
+          status: 'INVITED',
+        }),
+      }),
+    );
+    expect(tokenCreate).toHaveBeenCalledTimes(1);
+    expect(mailer.sendPasswordReset).toHaveBeenCalledTimes(1);
+    expect(mailer.sendPasswordReset).toHaveBeenCalledWith(
+      { email: 'owner@example.com', firstName: 'Alice' },
+      expect.any(String),
+    );
   });
 
   it('uses the caller-supplied slug instead of deriving one from the name when given', async () => {
-    const orgCreate = jest.fn().mockResolvedValue({
-      id: 'org-1',
-      name: 'APTICON',
-      slug: 'apticon-2027',
-    });
+    const orgCreate = jest.fn().mockResolvedValue({ id: 'org-1', name: 'APTICON', slug: 'apticon-2027' });
     const prisma = fakePrisma({
-      organization: {
-        findUnique: jest.fn().mockResolvedValue(null),
-        create: orgCreate,
-      },
-      role: { findFirst: jest.fn().mockResolvedValue({ id: 'role-owner' }) },
+      role: { findFirst: jest.fn().mockResolvedValue(ownerRole) },
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }) },
+      organization: { findUnique: jest.fn().mockResolvedValue(null), create: orgCreate },
+      organizationMembership: { create: jest.fn().mockResolvedValue({ id: 'membership-1' }) },
     });
 
-    await buildService(prisma).create('user-1', {
-      name: 'APTICON',
-      slug: 'APTICON 2027',
-    });
+    await buildService(prisma).create({ ...baseDto, slug: 'APTICON 2027' });
 
     expect(orgCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ slug: 'apticon-2027' }),
@@ -125,13 +161,13 @@ describe('OrganizationsService.create', () => {
 
   it('throws ConflictException when the slug is already taken', async () => {
     const prisma = fakePrisma({
-      organization: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'existing-org' }),
-      },
+      role: { findFirst: jest.fn().mockResolvedValue(ownerRole) },
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }) },
+      organization: { findUnique: jest.fn().mockResolvedValue({ id: 'existing-org' }) },
     });
 
     await expect(
-      buildService(prisma).create('user-1', { name: 'APTICON' }),
+      buildService(prisma).create(baseDto),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });
