@@ -2,9 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPatch } from '@/lib/api/client';
-import type { Organization } from '@/lib/organizations/types';
+import type { Organization, OrganizationStatus, OrganizationWithMemberCount } from '@/lib/organizations/types';
 
 const ORGANIZATIONS_QUERY_KEY = ['organizations', 'me'];
+const ALL_ORGANIZATIONS_QUERY_KEY = ['organizations', 'all'];
 
 export function useOrganizations() {
   return useQuery({
@@ -49,6 +50,32 @@ export function useUpdateOrganization(organizationId: string) {
   return useMutation({
     mutationFn: (input: UpdateOrganizationInput) => apiPatch(`organizations/${organizationId}`, input),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ORGANIZATIONS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Platform Super Admin only — every organization on the platform, not just
+ * the caller's own (apps/api gates GET /organizations with SuperAdminGuard;
+ * a regular user calling this gets a 403, so only render it behind an
+ * isSuperAdmin check).
+ */
+export function useAllOrganizations() {
+  return useQuery({
+    queryKey: ALL_ORGANIZATIONS_QUERY_KEY,
+    queryFn: () => apiGet<OrganizationWithMemberCount[]>('organizations'),
+  });
+}
+
+/** Platform Super Admin only — activates or suspends an organization. */
+export function useUpdateOrganizationStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ organizationId, status }: { organizationId: string; status: OrganizationStatus }) =>
+      apiPatch<Organization>(`organizations/${organizationId}/status`, { status }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ALL_ORGANIZATIONS_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ORGANIZATIONS_QUERY_KEY });
     },
   });

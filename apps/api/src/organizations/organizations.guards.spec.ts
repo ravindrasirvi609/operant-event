@@ -189,3 +189,104 @@ describe('POST /api/v1/organizations — guard chain', () => {
     );
   });
 });
+
+// ── GET /organizations (list all) and PATCH /organizations/:id/status ───────
+// Same guard chain as create — SuperAdminGuard — so this reuses the module
+// setup above by redeclaring it rather than importing private state.
+
+describe('GET /api/v1/organizations and PATCH /:id/status — guard chain', () => {
+  let app: INestApplication<App>;
+  let prismaUserFindUnique: jest.Mock;
+  let orgsServiceFindAll: jest.Mock;
+  let orgsServiceUpdateStatus: jest.Mock;
+
+  beforeEach(async () => {
+    prismaUserFindUnique = jest.fn();
+    orgsServiceFindAll = jest.fn().mockResolvedValue([STUB_ORG]);
+    orgsServiceUpdateStatus = jest.fn().mockResolvedValue({ ...STUB_ORG, status: 'SUSPENDED' });
+
+    const mockPrisma = { user: { findUnique: prismaUserFindUnique } } as unknown as PrismaService;
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [OrganizationsController],
+      providers: [
+        {
+          provide: OrganizationsService,
+          useValue: {
+            findAllForSuperAdmin: orgsServiceFindAll,
+            updateStatus: orgsServiceUpdateStatus,
+          },
+        },
+        { provide: PrismaService, useValue: mockPrisma },
+        SuperAdminGuard,
+      ],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useClass(StubJwtGuard)
+      .compile();
+
+    app = module.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+    await app.init();
+  });
+
+  afterEach(() => app.close());
+
+  it('GET /organizations returns 401 with no authentication', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/organizations');
+    expect(res.status).toBe(401);
+    expect(orgsServiceFindAll).not.toHaveBeenCalled();
+  });
+
+  it('GET /organizations returns 403 for a non-super-admin', async () => {
+    prismaUserFindUnique.mockResolvedValue({ isSuperAdmin: false });
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/organizations')
+      .set('x-test-user-id', 'regular-user-id');
+    expect(res.status).toBe(403);
+    expect(orgsServiceFindAll).not.toHaveBeenCalled();
+  });
+
+  it('GET /organizations returns 200 with the full list for a Super Admin', async () => {
+    prismaUserFindUnique.mockResolvedValue({ isSuperAdmin: true });
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/organizations')
+      .set('x-test-user-id', 'super-admin-id');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([STUB_ORG]);
+    expect(orgsServiceFindAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('PATCH /organizations/:id/status returns 403 for a non-super-admin', async () => {
+    prismaUserFindUnique.mockResolvedValue({ isSuperAdmin: false });
+    const res = await request(app.getHttpServer())
+      .patch('/api/v1/organizations/org-1/status')
+      .set('x-test-user-id', 'regular-user-id')
+      .send({ status: 'SUSPENDED' });
+    expect(res.status).toBe(403);
+    expect(orgsServiceUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /organizations/:id/status returns 400 for a status value outside ACTIVE/SUSPENDED', async () => {
+    prismaUserFindUnique.mockResolvedValue({ isSuperAdmin: true });
+    const res = await request(app.getHttpServer())
+      .patch('/api/v1/organizations/org-1/status')
+      .set('x-test-user-id', 'super-admin-id')
+      .send({ status: 'ARCHIVED' });
+    expect(res.status).toBe(400);
+    expect(orgsServiceUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it('PATCH /organizations/:id/status returns 200 and suspends the organization for a Super Admin', async () => {
+    prismaUserFindUnique.mockResolvedValue({ isSuperAdmin: true });
+    const res = await request(app.getHttpServer())
+      .patch('/api/v1/organizations/org-1/status')
+      .set('x-test-user-id', 'super-admin-id')
+      .send({ status: 'SUSPENDED' });
+    expect(res.status).toBe(200);
+    expect(orgsServiceUpdateStatus).toHaveBeenCalledWith('org-1', 'SUSPENDED');
+  });
+});

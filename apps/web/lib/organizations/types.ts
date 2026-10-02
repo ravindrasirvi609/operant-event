@@ -1,11 +1,20 @@
+export const ORGANIZATION_STATUSES = ['ACTIVE', 'SUSPENDED', 'ARCHIVED'] as const;
+export type OrganizationStatus = (typeof ORGANIZATION_STATUSES)[number];
+
 export interface Organization {
   id: string;
   name: string;
   slug: string;
+  status: OrganizationStatus;
   contactEmail: string | null;
   contactPhone: string | null;
   website: string | null;
   logoFileId: string | null;
+}
+
+/** Shape returned only by GET /organizations (Super Admin's all-organizations list). */
+export interface OrganizationWithMemberCount extends Organization {
+  _count: { memberships: number };
 }
 
 export const MEMBERSHIP_STATUSES = ['INVITED', 'ACTIVE', 'DEACTIVATED'] as const;

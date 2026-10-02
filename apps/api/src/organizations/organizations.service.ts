@@ -142,6 +142,32 @@ export class OrganizationsService {
     });
   }
 
+  /** Platform Super Admin only — every organization on the platform, regardless
+   *  of the caller's own membership. Includes a member count so the admin can
+   *  tell an active workspace from an abandoned one at a glance. */
+  async findAllForSuperAdmin() {
+    return this.prisma.organization.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { memberships: true } } },
+    });
+  }
+
+  /** Platform Super Admin only — activates or suspends an organization.
+   *  Suspension is enforced centrally by PermissionsGuard, which blocks every
+   *  permission-gated action the moment an organization's status isn't ACTIVE. */
+  async updateStatus(organizationId: string, status: 'ACTIVE' | 'SUSPENDED') {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+    if (!organization) {
+      throw new NotFoundException('Organization not found.');
+    }
+    return this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { status },
+    });
+  }
+
   async update(organizationId: string, dto: UpdateOrganizationDto) {
     return this.prisma.organization.update({
       where: { id: organizationId },

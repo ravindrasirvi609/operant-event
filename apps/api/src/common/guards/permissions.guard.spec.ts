@@ -32,6 +32,7 @@ function activeMembershipWithPermissions(
 ) {
   return {
     status: 'ACTIVE',
+    organization: { status: 'ACTIVE' },
     roles: [
       {
         role: {
@@ -86,6 +87,21 @@ describe('PermissionsGuard', () => {
     const findUnique = jest.fn().mockResolvedValue({
       ...activeMembershipWithPermissions(),
       status: 'DEACTIVATED',
+    });
+    const { guard, context } = buildGuard(fakePrisma(findUnique), {
+      headers: { [ORGANIZATION_HEADER]: 'org-1' },
+      user: { id: 'user-1' },
+    });
+
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('throws ForbiddenException when the organization has been suspended by a Super Admin, even for an active member with every permission', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      ...activeMembershipWithPermissions({ module: 'conference', action: 'create' }),
+      organization: { status: 'SUSPENDED' },
     });
     const { guard, context } = buildGuard(fakePrisma(findUnique), {
       headers: { [ORGANIZATION_HEADER]: 'org-1' },

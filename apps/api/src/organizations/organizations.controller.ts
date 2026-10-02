@@ -10,6 +10,7 @@ import {
 import { OrganizationsService } from './organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { UpdateOrganizationStatusDto } from './dto/update-organization-status.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -43,6 +44,20 @@ export class OrganizationsController {
   @Get('me')
   findMine(@CurrentUser() user: AuthenticatedUser) {
     return this.organizationsService.findMine(user.id);
+  }
+
+  /** Platform Super Admin only — lists every organization, not just the caller's own. */
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @Get()
+  findAll() {
+    return this.organizationsService.findAllForSuperAdmin();
+  }
+
+  /** Platform Super Admin only — activates or suspends an organization. */
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @Patch(':id/status')
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateOrganizationStatusDto) {
+    return this.organizationsService.updateStatus(id, dto.status);
   }
 
   @UseGuards(JwtAuthGuard, PermissionsGuard)

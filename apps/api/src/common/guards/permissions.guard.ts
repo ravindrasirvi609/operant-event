@@ -50,6 +50,7 @@ export class PermissionsGuard implements CanActivate {
     const membership = await this.prisma.organizationMembership.findUnique({
       where: { organizationId_userId: { organizationId, userId } },
       include: {
+        organization: { select: { status: true } },
         roles: {
           include: {
             role: {
@@ -67,6 +68,16 @@ export class PermissionsGuard implements CanActivate {
     if (!membership || membership.status !== 'ACTIVE') {
       throw new ForbiddenException(
         'You are not an active member of this organization.',
+      );
+    }
+
+    // A Super Admin can suspend an organization (OrganizationsController's
+    // updateStatus route) — once suspended, every permission-gated action
+    // across the whole app is blocked here, in one place, regardless of the
+    // caller's own role or permissions within that organization.
+    if (membership.organization.status !== 'ACTIVE') {
+      throw new ForbiddenException(
+        'This organization is not active. Contact your platform administrator.',
       );
     }
 

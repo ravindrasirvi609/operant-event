@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Env } from '@operant-event/config';
 import { OrganizationsService } from './organizations.service';
@@ -169,6 +169,65 @@ describe('OrganizationsService.create', () => {
     await expect(
       buildService(prisma).create(baseDto),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('OrganizationsService.findAllForSuperAdmin', () => {
+  it('lists every organization regardless of the caller, ordered newest first, with a member count', async () => {
+    const orgs = [
+      { id: 'org-2', name: 'Newer Org', slug: 'newer-org', status: 'ACTIVE', _count: { memberships: 3 } },
+      { id: 'org-1', name: 'Older Org', slug: 'older-org', status: 'SUSPENDED', _count: { memberships: 7 } },
+    ];
+    const findMany = jest.fn().mockResolvedValue(orgs);
+    const prisma = fakePrisma({ organization: { findMany } });
+
+    const result = await buildService(prisma).findAllForSuperAdmin();
+
+    expect(findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { memberships: true } } },
+    });
+    expect(result).toEqual(orgs);
+  });
+});
+
+describe('OrganizationsService.updateStatus', () => {
+  it('suspends an active organization', async () => {
+    const existing = { id: 'org-1', status: 'ACTIVE' };
+    const updated = { id: 'org-1', status: 'SUSPENDED' };
+    const findUnique = jest.fn().mockResolvedValue(existing);
+    const update = jest.fn().mockResolvedValue(updated);
+    const prisma = fakePrisma({ organization: { findUnique, update } });
+
+    const result = await buildService(prisma).updateStatus('org-1', 'SUSPENDED');
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      data: { status: 'SUSPENDED' },
+    });
+    expect(result).toEqual(updated);
+  });
+
+  it('re-activates a suspended organization', async () => {
+    const findUnique = jest.fn().mockResolvedValue({ id: 'org-1', status: 'SUSPENDED' });
+    const update = jest.fn().mockResolvedValue({ id: 'org-1', status: 'ACTIVE' });
+    const prisma = fakePrisma({ organization: { findUnique, update } });
+
+    await buildService(prisma).updateStatus('org-1', 'ACTIVE');
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 'org-1' },
+      data: { status: 'ACTIVE' },
+    });
+  });
+
+  it('throws NotFoundException when the organization does not exist', async () => {
+    const findUnique = jest.fn().mockResolvedValue(null);
+    const prisma = fakePrisma({ organization: { findUnique } });
+
+    await expect(
+      buildService(prisma).updateStatus('missing-org', 'SUSPENDED'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
