@@ -292,8 +292,9 @@ body(
     "Before any organizing team can exist, the platform itself needs to be set up by a Platform "
     "Super Admin. This is a special account held by whoever operates the Operant Event platform "
     "for your organization (typically your IT team or service provider). The Super Admin sits "
-    "above all organizations and has one exclusive job: creating new organizations on the platform "
-    "and designating each one's first owner."
+    "above all organizations and has two exclusive jobs: creating new organizations on the platform "
+    "(designating each one's first owner), and overseeing every organization that exists — including "
+    "the ability to suspend one."
 )
 t_sa = doc.add_table(rows=2, cols=2)
 t_sa.style = "Table Grid"
@@ -301,6 +302,7 @@ for i, (h_val, v_val) in enumerate([
     ("Role", "In plain terms"),
     ("Platform Super Admin",
      "The platform operator. Creates new organizations and provisions their first Organization Owner. "
+     "Can see every organization on the platform in one list and suspend or reactivate any of them. "
      "Does not participate in the day-to-day running of any individual conference. There is only one "
      "Super Admin account per platform deployment."),
 ]):
@@ -314,6 +316,31 @@ add_callout(
     "If you're setting up a new organization: ask the person who runs the Operant Event platform "
     "for your institution to provision a new organization for you. They will create it and send you "
     "an invitation email to set your password and take ownership of your new workspace."
+)
+add_image(doc, "diagram8_platform_governance.png", "Figure — How the Super Admin creates and governs organizations")
+
+h3("Suspending or Reactivating an Organization")
+body(
+    "From the All Organizations screen, the Super Admin can see every organization on the platform "
+    "at a glance — its name, how many members it has, and whether it's currently Active or Suspended."
+)
+bullet_pairs = [
+    ("Suspend", "immediately blocks every member of that organization from everything: conferences, "
+                "abstracts, registrations, payments, reports, settings. Nobody inside that organization "
+                "can override this, no matter what role they hold. Because the effect is immediate and "
+                "wide-reaching, the Super Admin must confirm the action before it takes effect."),
+    ("Activate", "immediately restores access exactly as it was before the suspension. No data is lost "
+                 "while an organization is suspended; everything simply becomes accessible again."),
+]
+for label, rest in bullet_pairs:
+    p = doc.add_paragraph(style="OE Bullet")
+    r = p.add_run(label + " — ")
+    r.bold = True
+    p.add_run(rest)
+body(
+    "This is typically used for billing issues, policy violations, or while an account dispute is "
+    "being resolved — it is a platform-level safety switch, not something that happens as part of "
+    "normal day-to-day use."
 )
 
 h3("Your Organizing Team")
@@ -400,6 +427,7 @@ body(
     "account through the public sign-up page. Organization workspaces are set up separately by the "
     "Platform Super Admin (see Section 2)."
 )
+add_image(doc, "diagram9_account_paths.png", "Figure — Three ways to get an Operant Event account")
 h3("Creating a personal account")
 steps = [
     "Go to the sign-up page (shared by your organizer, or linked from a conference's public page).",
@@ -466,6 +494,7 @@ add_horizontal_rule(doc)
 
 # ── Section 6 ──────────────────────────────────────────────────────────────
 h1("6. Managing Your Team: Members, Roles & Permissions")
+add_image(doc, "diagram10_team_invite.png", "Figure — Inviting a team member and assigning their role")
 h3("Inviting a Team Member")
 steps6 = [
     "Open Team → Members in the organizer back-office.",
@@ -815,15 +844,18 @@ h1("21. Roles and Permissions Reference")
 body("This is a complete listing of every individual capability. Most users will never need this section — it's for Organization Owners creating custom roles, or team members wanting to understand their access exactly.")
 add_callout(
     doc,
-    "Creating a new organization is an exclusive capability of the Platform Super Admin — a "
-    "platform-level account that sits above all organizations. It is not part of the organization "
-    "role system and cannot be delegated or granted to an Organization Owner. The table below "
-    "covers only organization-level roles."
+    "Creating a new organization, viewing every organization on the platform, and suspending or "
+    "reactivating one are all exclusive capabilities of the Platform Super Admin — a platform-level "
+    "account that sits above all organizations. None of these are part of the organization role "
+    "system, and none can be delegated or granted to an Organization Owner, no matter which "
+    "permissions a custom role carries. The table below covers only organization-level roles."
 )
 
 perm_rows = [
     ("Capability", "Owner", "Admin", "Conf Admin", "Track Chair"),
     ("Create a new organization", "Super Admin only", "—", "—", "—"),
+    ("View every organization on the platform", "Super Admin only", "—", "—", "—"),
+    ("Suspend or reactivate an organization", "Super Admin only", "—", "—", "—"),
     ("Edit organization settings", "✅", "✅", "—", "—"),
     ("Invite / remove team members", "✅", "✅", "—", "—"),
     ("Change a team member's role", "✅", "—", "—", "—"),
@@ -915,6 +947,8 @@ faqs = [
      "You cannot create an organization yourself — this is intentional. Only the Platform Super Admin can provision new organizations. Contact your IT department or platform administrator and ask them to create one for you. They will enter the details and designate you as the first owner; you'll then receive an invitation email."),
     ("I received an 'invitation to set your password' email — what is that?",
      "It means the Platform Super Admin has created a new organization and designated you as its first owner, or an existing Organization Owner has invited you to join their team. Click the link (valid for 7 days), set your password, and you'll be taken directly into the back-office. If the link has expired, ask the person who invited you to send a new one."),
+    ("I can suddenly no longer access my organization — everything is blocked. What happened?",
+     "This almost always means your organization has been suspended by the Platform Super Admin — usually for a billing or policy reason unrelated to anything you personally did. It affects every member equally, including the Organization Owner, and no one inside the organization can lift it themselves. Contact your platform administrator; once reactivated, your access returns exactly as it was, with no data lost."),
     ("I can't find the conference I want to register for.",
      "Ask the organizer to share the direct link. Conferences are not in a public directory by default."),
     ("My paper shows as 'Submitted' — has anyone looked at it yet?",
@@ -1020,7 +1054,7 @@ add_horizontal_rule(doc)
 h1("Quick Reference: Who Does What")
 qr_rows = [
     ("I am a…", "My first step", "My main section"),
-    ("Platform Super Admin", "Log in with your Super Admin account; create a new organization", "Sections 2, 5"),
+    ("Platform Super Admin", "Log in with your Super Admin account; create, view, or suspend organizations", "Section 2"),
     ("Conference organizer (new Organization Owner)", "Accept your invitation email, set your password, then create your first conference", "Sections 4, 5, 8"),
     ("Track Chair", "Open your conference track, add reviewers", "Sections 9, 11"),
     ("Author submitting a paper", "Sign in (or create account), click the submission link", "Section 10"),

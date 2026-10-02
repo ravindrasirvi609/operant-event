@@ -72,13 +72,24 @@ Operant Event is built around two broad groups of people: the **team that organi
 
 ### Platform Super Admin
 
-Before any organizing team can exist, the platform itself needs to be set up by a **Platform Super Admin**. This is a special account held by whoever operates the Operant Event platform for your organization (typically your IT team or service provider). The Super Admin sits above all organizations and has one exclusive job: **creating new organizations** on the platform and designating each one's first owner.
+Before any organizing team can exist, the platform itself needs to be set up by a **Platform Super Admin**. This is a special account held by whoever operates the Operant Event platform for your organization (typically your IT team or service provider). The Super Admin sits above all organizations and has two exclusive jobs: **creating new organizations** on the platform (designating each one's first owner), and **overseeing every organization that exists** — including the ability to suspend one.
 
 | Role | In plain terms |
 |---|---|
-| **Platform Super Admin** | The platform operator. Creates new organizations (workspaces) and provisions their first Organization Owner. Does not participate in the day-to-day running of any individual conference. There is only one Super Admin account per platform deployment. |
+| **Platform Super Admin** | The platform operator. Creates new organizations (workspaces) and provisions their first Organization Owner. Can see every organization on the platform in one list and suspend or reactivate any of them. Does not participate in the day-to-day running of any individual conference. There is only one Super Admin account per platform deployment. |
 
 > **If you're setting up a new organization:** You don't self-register as an owner. Instead, ask the person who runs the Operant Event platform for your institution (your IT team or platform administrator) to provision a new organization for you. They will create it and send you an invitation email to set your password and take ownership of your new workspace.
+
+![Platform Governance](images/diagram8_platform_governance.png)
+
+### Suspending or Reactivating an Organization
+
+From the **All Organizations** screen, the Super Admin can see every organization on the platform at a glance — its name, how many members it has, and whether it's currently Active or Suspended. Two things can happen there:
+
+- **Suspend** — immediately blocks every member of that organization from everything: conferences, abstracts, registrations, payments, reports, settings. Nobody inside that organization can override this, no matter what role they hold. Because the effect is immediate and wide-reaching, the Super Admin must confirm the action before it takes effect.
+- **Activate** — immediately restores access exactly as it was before the suspension. No data is lost while an organization is suspended; everything simply becomes read-and-write-accessible again.
+
+This is typically used for billing issues, policy violations, or while an account dispute is being resolved — it is a platform-level safety switch, not something that happens as part of normal day-to-day use.
 
 ### Your Organizing Team
 
@@ -129,6 +140,8 @@ A single person can move between several of these without any extra effort — f
 
 Most people — authors, reviewers, attendees, and organizing team members — create a personal account through the public sign-up page. Organization workspaces are set up separately by the Platform Super Admin (see [Section 2](#2-who-uses-this-application)).
 
+![Three Ways to Get an Account](images/diagram9_account_paths.png)
+
 **Creating a personal account (for authors, reviewers, attendees, and most organizers):**
 
 1. **Go to the sign-up page.** Your organization will share a link, or you may arrive there automatically after clicking "Register" on a conference's public page.
@@ -172,6 +185,8 @@ There is nothing stopping one person from belonging to more than one organizatio
 ## 6. Managing Your Team: Members, Roles & Permissions
 
 As your organization grows, you'll want colleagues to help run things — without necessarily giving every one of them full control.
+
+![Inviting a Team Member & Assigning Their Role](images/diagram10_team_invite.png)
 
 ### Inviting a Team Member
 
@@ -711,11 +726,13 @@ This section is a complete listing of every individual capability in the system.
 
 **How to read this table:** Each row is one individual capability (permission). A tick (✅) means the built-in role has this capability. A dash (—) means they don't, by default. A custom role can be given any subset of the organization-level permissions.
 
-> **Note on the Platform Super Admin:** Creating a new organization is an exclusive capability of the **Platform Super Admin** — a platform-level account that sits above all organizations. It is not part of the organization role system and cannot be delegated or granted to an Organization Owner. The table below covers only organization-level roles.
+> **Note on the Platform Super Admin:** Creating a new organization, viewing every organization on the platform, and suspending or reactivating one are all exclusive capabilities of the **Platform Super Admin** — a platform-level account that sits above all organizations. None of these are part of the organization role system, and none of them can be delegated or granted to an Organization Owner, no matter which permissions a custom role carries. The table below covers only organization-level roles.
 
 | Capability | Org Owner | Org Admin | Conf Admin | Track Chair |
 |---|:---:|:---:|:---:|:---:|
 | Create a new organization | Platform Super Admin only — see note above | — | — | — |
+| View every organization on the platform | Platform Super Admin only — see note above | — | — | — |
+| Suspend or reactivate an organization | Platform Super Admin only — see note above | — | — | — |
 | Edit organization settings (name, branding, billing) | ✅ | ✅ | — | — |
 | View all organization members | ✅ | ✅ | — | — |
 | Invite a new team member | ✅ | ✅ | — | — |
@@ -786,6 +803,11 @@ You cannot create an organization yourself — this is intentional. Only the **P
 
 **Q: I received an "invitation to set your password" email — what is that?**
 It means either the Platform Super Admin has just created a new organization and designated you as its first owner, or an existing Organization Owner has invited you to join their team. Click the link in the email (it is valid for 7 days), set your password, and you'll be taken directly into the back-office with whatever access you were given. If the link has expired, ask the person who invited you to send a new one.
+
+---
+
+**Q: I can suddenly no longer access my organization — everything is blocked. What happened?**
+This almost always means your organization has been suspended by the Platform Super Admin — usually for a billing or policy reason unrelated to anything you personally did. It affects every member equally, including the Organization Owner, and no one inside the organization can lift it themselves. Contact your platform administrator to find out why and have it reactivated; once it is, your access returns exactly as it was, with no data lost in between.
 
 ---
 
@@ -911,7 +933,7 @@ This glossary defines the words Operant Event uses and explains what they mean i
 
 | I am a… | My first step | My main section |
 |---|---|---|
-| **Platform Super Admin** | Log in with your Super Admin account; create a new organization | Section 2, 5 |
+| **Platform Super Admin** | Log in with your Super Admin account; create, view, or suspend organizations | Section 2 |
 | **Conference organizer (new Organization Owner)** | Accept your invitation email, set your password, then create your first conference | Sections 4, 5, 8 |
 | **Track Chair** | Open your conference track, add reviewers | Sections 9, 11 |
 | **Author submitting a paper** | Sign in (or create account), find the conference submission link | Section 10 |

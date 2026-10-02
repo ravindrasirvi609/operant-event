@@ -472,6 +472,187 @@ def d7_portals():
     save(fig, 'diagram7_portals.png')
 
 
+# ────────────────────────────────────────────────────────────────────────────
+# Diagram 8 – Platform Governance: Creating & Suspending Organizations
+# ────────────────────────────────────────────────────────────────────────────
+def d8_platform_governance():
+    fig, ax = plt.subplots(figsize=(14.5, 10.5))
+    ax.set_xlim(0, 14.5); ax.set_ylim(0, 10.5)
+    ax.axis('off')
+    fig.patch.set_facecolor('white')
+
+    ax.text(7.25, 10.15, 'Platform Governance — Only the Super Admin Does This', ha='center',
+            fontsize=13, fontweight='bold', color=C_GRAY)
+
+    W, H = 2.6, 0.8
+
+    def bx(x, y, lbl, fc, ec, fs=8.3, bold=True, sub=None, w=W, h=H):
+        box(ax, x, y, w, h, lbl, fc, ec, fontsize=fs, bold=bold, subtext=sub, subfontsize=7)
+
+    # ── Lane label ──
+    ax.text(0.95, 8.3, 'CREATING AN\nORGANIZATION', ha='center', fontsize=8.5,
+            color=C_BLUE, fontweight='bold')
+
+    # Top lane: creation flow
+    bx(2.6, 8.0, 'Super Admin Enters Org\n+ Owner Email/Name', C_BLUE_L, C_BLUE)
+    bx(6.0, 8.0, 'System Checks:\nDoes Owner Have an Account?', C_AMBER_L, C_AMBER, w=3.0)
+
+    arrow(ax, 2.6 + W/2, 8.0, 6.0 - 1.5, 8.0)
+
+    bx(9.6, 8.9, 'YES — Existing User\nAdded as Owner (ACTIVE)', C_GREEN_L, C_GREEN, fs=8)
+    bx(9.6, 7.1, 'NO — New Account Created\n(INVITED) + Set-Password Email Sent',
+       C_TEAL_L, C_TEAL, fs=8, w=3.0)
+
+    arrow(ax, 6.0 + 1.5, 8.0, 9.6 - W/2, 8.9, rad=0.12)
+    arrow(ax, 6.0 + 1.5, 8.0, 9.6 - 1.5, 7.1, rad=-0.12)
+
+    bx(12.8, 7.1, 'Owner Clicks Link,\nSets Password', C_TEAL_L, C_TEAL, fs=7.8)
+    arrow(ax, 9.6 + 1.5, 7.1, 12.8 - W/2, 7.1)
+
+    bx(7, 5.9, 'Organization Owner Is Active — Manages the New Workspace',
+       C_GREEN_L, C_GREEN, fs=9, bold=True, w=6.4, h=0.75)
+    arrow(ax, 9.6, 8.9 - H/2, 7 + 1.0, 5.9 + H/2 + 0.05, rad=0.08)
+    arrow(ax, 12.8, 7.1 - H/2, 7 + 2.4, 5.9 + H/2 - 0.05, rad=0.1)
+
+    # Divider — sits in the gap between the top lane's lowest box (converge,
+    # bottom edge 5.525) and the bottom lane's highest box (SUSPEND, top edge 5.4).
+    ax.plot([0.3, 14.2], [5.46, 5.46], color=C_GRAY_MID, lw=0.8, linestyle='--')
+
+    # Bottom lane: suspend/activate flow
+    # va='top' anchors the TOP of the text block (not the first line's
+    # baseline), so it's a predictable distance below the divider regardless
+    # of exact font-metric quirks.
+    ax.text(0.95, 4.75, 'ACTIVATING OR\nSUSPENDING AN ORG', ha='center', va='top',
+            fontsize=8.5, color=C_RED, fontweight='bold')
+
+    bx(2.6, 4.15, 'Super Admin Opens\n"All Organizations"', C_BLUE_L, C_BLUE)
+    bx(6.0, 4.15, 'Picks an Organization,\nClicks Suspend or Activate', C_AMBER_L, C_AMBER, w=3.0)
+    arrow(ax, 2.6 + W/2, 4.15, 6.0 - 1.5, 4.15)
+
+    bx(9.8, 5.0, 'SUSPEND\nConfirmation Required', C_RED_L, C_RED, fs=8.3, w=2.8)
+    bx(9.8, 3.3, 'ACTIVATE\nTakes Effect Immediately', C_GREEN_L, C_GREEN, fs=8.3, w=2.8)
+    arrow(ax, 6.0 + 1.5, 4.15, 9.8 - 1.4, 5.0, rad=0.1)
+    arrow(ax, 6.0 + 1.5, 4.15, 9.8 - 1.4, 3.3, rad=-0.1)
+
+    bx(2.3, 1.9, 'Every Member Instantly\nLoses Access — All Conferences,\nData & Settings Blocked',
+       C_RED_L, C_RED, fs=7.8, w=3.4, h=1.0)
+    bx(6.0, 1.9, 'Members Regain Access\nExactly as It Was Before',
+       C_GREEN_L, C_GREEN, fs=7.8, w=3.0, h=1.0)
+    arrow(ax, 9.8 - 1.4, 5.0, 2.3 + 1.7, 1.9 + 0.5, rad=0.25)
+    arrow(ax, 9.8 - 1.4, 3.3, 6.0 + 1.5, 1.9 + 0.3, rad=0.08)
+
+    ax.text(7.25, 0.45,
+            'Enforced centrally for every request — not something an Organization Owner can override from inside their own org.',
+            ha='center', fontsize=8, color='#6B7280', style='italic')
+
+    save(fig, 'diagram8_platform_governance.png')
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Diagram 9 – Three Ways to Get an Operant Event Account
+# ────────────────────────────────────────────────────────────────────────────
+def d9_account_paths():
+    fig, ax = plt.subplots(figsize=(14, 8))
+    ax.set_xlim(0, 14); ax.set_ylim(0, 8)
+    ax.axis('off')
+    fig.patch.set_facecolor('white')
+
+    ax.text(7, 7.65, 'Three Ways to Get an Operant Event Account', ha='center',
+            fontsize=13, fontweight='bold', color=C_GRAY)
+
+    W, H = 3.3, 0.85
+
+    def bx(x, y, lbl, fc, ec, fs=8.2, bold=True, sub=None, w=W):
+        box(ax, x, y, w, H, lbl, fc, ec, fontsize=fs, bold=bold, subtext=sub, subfontsize=7)
+
+    cols = [2.3, 7.0, 11.7]
+    headers = [
+        ('Self-Registration', 'Authors · Reviewers ·\nAttendees · Speakers', C_TEAL),
+        ('Super Admin Provisions\nan Organization', 'First Owner of a\nnew workspace', C_BLUE),
+        ('Team Invitation', 'Added by an existing\nOrganization Owner/Admin', C_PURPLE),
+    ]
+    for x, (title, sub, color) in zip(cols, headers):
+        ax.text(x, 6.95, title, ha='center', fontsize=9.5, fontweight='bold', color=color)
+        ax.text(x, 6.55, sub, ha='center', fontsize=7.5, color='#6B7280', style='italic')
+
+    # Column A — self-registration
+    bx(cols[0], 5.6, 'Visits Public\nSign-Up Page', C_TEAL_L, C_TEAL)
+    bx(cols[0], 4.4, 'Enters Name,\nEmail & Password', C_TEAL_L, C_TEAL)
+    bx(cols[0], 3.2, 'Account Is ACTIVE\nImmediately', C_GREEN_L, C_GREEN)
+    arrow(ax, cols[0], 5.6-H/2, cols[0], 4.4+H/2)
+    arrow(ax, cols[0], 4.4-H/2, cols[0], 3.2+H/2)
+
+    # Column B — super admin creates org
+    bx(cols[1], 5.6, 'Super Admin Enters\nOwner Email + Name', C_BLUE_L, C_BLUE)
+    bx(cols[1], 4.4, 'Account Created\n(INVITED) + Email Sent', C_AMBER_L, C_AMBER)
+    bx(cols[1], 3.2, 'Clicks Link,\nSets Password → ACTIVE', C_GREEN_L, C_GREEN)
+    arrow(ax, cols[1], 5.6-H/2, cols[1], 4.4+H/2)
+    arrow(ax, cols[1], 4.4-H/2, cols[1], 3.2+H/2)
+
+    # Column C — team invite
+    bx(cols[2], 5.6, 'Owner/Admin Invites\nby Email + Role', C_PURPLE_L, C_PURPLE)
+    bx(cols[2], 4.4, 'Account Created\n(INVITED) + Email Sent', C_AMBER_L, C_AMBER)
+    bx(cols[2], 3.2, 'Clicks Link,\nSets Password → ACTIVE', C_GREEN_L, C_GREEN)
+    arrow(ax, cols[2], 5.6-H/2, cols[2], 4.4+H/2)
+    arrow(ax, cols[2], 4.4-H/2, cols[2], 3.2+H/2)
+
+    # Converge
+    bx(7, 1.5, 'One Operant Event Account — Many Hats',
+       C_GRAY_L, C_GRAY, fs=10, bold=True, w=5.0)
+    for x in cols:
+        arrow(ax, x, 3.2-H/2, 7 + (x-7)*0.3, 1.5+H/2, rad=0.0)
+
+    ax.text(7, 0.55,
+            'The same login can be an Organization Owner here, a Reviewer there, and an Attendee somewhere else — all at once.',
+            ha='center', fontsize=8, color='#6B7280', style='italic')
+
+    save(fig, 'diagram9_account_paths.png')
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Diagram 10 – Team Invitation & Role Assignment Flow
+# ────────────────────────────────────────────────────────────────────────────
+def d10_team_invite():
+    fig, ax = plt.subplots(figsize=(13, 7))
+    ax.set_xlim(0, 13); ax.set_ylim(0, 7)
+    ax.axis('off')
+    fig.patch.set_facecolor('white')
+
+    ax.text(6.5, 6.65, 'Inviting a Team Member & Assigning Their Role', ha='center',
+            fontsize=13, fontweight='bold', color=C_GRAY)
+
+    W, H = 2.9, 0.8
+
+    def bx(x, y, lbl, fc, ec, fs=8.3, bold=True, sub=None, w=W, h=H):
+        box(ax, x, y, w, h, lbl, fc, ec, fontsize=fs, bold=bold, subtext=sub, subfontsize=7)
+
+    bx(1.8, 5.5, 'Owner/Admin Opens\nTeam → Members', C_BLUE_L, C_BLUE)
+    bx(5.0, 5.5, 'Enters Email, Name\n& Chooses a Role', C_BLUE_L, C_BLUE)
+    bx(8.2, 5.5, 'System Checks:\nDoes This Email Exist?', C_AMBER_L, C_AMBER, w=3.0)
+
+    arrow(ax, 1.8+W/2, 5.5, 5.0-W/2, 5.5)
+    arrow(ax, 5.0+W/2, 5.5, 8.2-1.5, 5.5)
+
+    bx(11.5, 6.3, 'YES — Membership Added\nto Existing Account', C_GREEN_L, C_GREEN, fs=7.8)
+    bx(11.5, 4.6, 'NO — New Account (INVITED)\n+ Set-Password Email Sent', C_TEAL_L, C_TEAL, fs=7.8, w=3.0)
+    arrow(ax, 8.2+1.5, 5.5, 11.5-W/2, 6.3, rad=0.1)
+    arrow(ax, 8.2+1.5, 5.5, 11.5-1.5, 4.6, rad=-0.1)
+
+    bx(11.5, 3.0, 'Invitee Clicks Link,\nSets Their Password', C_TEAL_L, C_TEAL, fs=7.8)
+    arrow(ax, 11.5, 4.6-H/2, 11.5, 3.0+H/2)
+
+    bx(6.5, 1.7, 'Membership Becomes ACTIVE — Appears in Team List With Assigned Role',
+       C_GREEN_L, C_GREEN, fs=9, bold=True, w=7.5, h=0.75)
+    arrow(ax, 11.5, 6.3-H/2, 6.5+2.3, 1.7+0.5, rad=0.15)
+    arrow(ax, 11.5, 3.0-H/2, 6.5+2.3, 1.7+0.1, rad=0.0)
+
+    ax.text(6.5, 0.6,
+            'Changing someone\'s role later works the same way — open their profile in Team → Members and pick a different role.',
+            ha='center', fontsize=8, color='#6B7280', style='italic')
+
+    save(fig, 'diagram10_team_invite.png')
+
+
 # ── Run all ─────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     print('Generating Operant Event user-guide diagrams...')
@@ -482,4 +663,7 @@ if __name__ == '__main__':
     d5_checkin()
     d6_certificates()
     d7_portals()
+    d8_platform_governance()
+    d9_account_paths()
+    d10_team_invite()
     print('All diagrams generated.')
