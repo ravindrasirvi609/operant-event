@@ -4,6 +4,9 @@
 # The CI/CD workflow (deploy.yml) copies this file to the server before running it.
 #
 # Prerequisites on the EC2 host:
+#   - Repo already cloned once at /home/ubuntu/operant-event (this script only
+#     fetches + resets an existing clone — it does not do the initial clone):
+#       git clone git@github-personal:ravindrasirvi609/operant-event.git /home/ubuntu/operant-event
 #   - NVM installed at $HOME/.nvm  (version from .nvmrc is used automatically)
 #   - jq installed (for SSM JSON parsing: sudo apt-get install -y jq)
 #   - AWS CLI installed and the instance IAM role grants ssm:GetParametersByPath
@@ -14,21 +17,16 @@
 
 set -euo pipefail
 
-# ── Node version ────────────────────────────────────────────────────────────
-export NVM_DIR="$HOME/.nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  # shellcheck source=/dev/null
-  source "$NVM_DIR/nvm.sh"
-fi
-
-# Use the version declared in .nvmrc — single source of truth shared with CI
-nvm use "$(cat /home/ubuntu/operant-event/.nvmrc)"
-
 # ── Repository ──────────────────────────────────────────────────────────────
+# Pull the latest code FIRST. .nvmrc, like everything else the rest of this
+# script depends on, only exists on disk once this has run — reading it any
+# earlier (as a previous version of this script did) fails on a fresh clone
+# or whenever the on-disk checkout predates the commit that added .nvmrc.
+if [ ! -d /home/ubuntu/operant-event/.git ]; then
+  echo "ERROR: /home/ubuntu/operant-event is not a git checkout. Clone the repo there once before running this script (see prerequisites above)." >&2
+  exit 1
+fi
 cd /home/ubuntu/operant-event
-
-echo "Node version:"; node -v
-echo "npm version:";  npm -v
 
 echo "Pulling latest code..."
 git fetch origin main
@@ -40,6 +38,33 @@ echo "Current SHA (rollback target): $PREV_SHA"
 git reset --hard origin/main
 NEW_SHA=$(git rev-parse HEAD)
 echo "Deploying SHA: $NEW_SHA"
+
+# ── Node version ────────────────────────────────────────────────────────────
+export NVM_DIR="$HOME/.nvm"
+
+# nvm.sh itself is not written to tolerate Bash strict mode (`set -u`) — a
+# known upstream incompatibility (nvm-sh/nvm#1183 and similar). Since it's
+# sourced into this same shell, `nounset` would otherwise still be active
+# when nvm's internal code runs and can crash with "VERSION: unbound
+# variable" on some code paths. Relax it for just this block.
+set +u
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck source=/dev/null
+  source "$NVM_DIR/nvm.sh"
+fi
+
+# Use the version declared in .nvmrc — single source of truth shared with CI.
+# Fail with a clear message rather than silently passing an empty string to
+# `nvm use` (which is what triggered the unbound-variable crash above).
+if [ ! -s .nvmrc ]; then
+  echo "ERROR: .nvmrc not found in $(pwd) after pulling origin/main. Cannot determine Node version." >&2
+  exit 1
+fi
+nvm use "$(cat .nvmrc)"
+set -u
+
+echo "Node version:"; node -v
+echo "npm version:";  npm -v
 
 # ── Package manager ──────────────────────────────────────────────────────────
 echo "Setting up package manager..."
