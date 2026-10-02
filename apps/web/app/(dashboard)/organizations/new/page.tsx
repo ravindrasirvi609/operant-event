@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { Loader2 } from 'lucide-react';
 import { apiPost } from '@/lib/api/client';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useQueryClient } from '@tanstack/react-query';
@@ -66,8 +67,18 @@ export default function NewOrganizationPage() {
     }
   }
 
-  // Render nothing while confirming Super Admin status or during the redirect.
-  if (isLoading || !currentUser?.isSuperAdmin) {
+  // Show a spinner while the user profile is being fetched (avoids a blank flash).
+  if (isLoading) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Checking access…" />
+      </div>
+    );
+  }
+
+  // Redirect is underway (triggered by the useEffect above) — render nothing
+  // so we don't flash the form during navigation.
+  if (!currentUser?.isSuperAdmin) {
     return null;
   }
 

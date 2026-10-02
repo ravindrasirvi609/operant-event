@@ -142,7 +142,7 @@ export default function DashboardHomePage() {
   const organizationsQuery = useOrganizations();
   const { activeOrgId, setActiveOrganization } = useActiveOrganization();
   const conferencesQuery = useConferences();
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading: isCurrentUserLoading } = useCurrentUser();
 
   useEffect(() => {
     if (!activeOrgId && organizationsQuery.data && organizationsQuery.data.length > 0) {
@@ -156,7 +156,11 @@ export default function DashboardHomePage() {
       empty={
         <div className="space-y-3">
           <h1 className="text-xl font-semibold">Welcome to Operant Event</h1>
-          {currentUser?.isSuperAdmin ? (
+          {/* Wait for the user profile so we show the right empty-state variant
+              without a flash of the wrong content. */}
+          {isCurrentUserLoading ? (
+            <div className="h-4 w-64 animate-pulse rounded bg-muted" />
+          ) : currentUser?.isSuperAdmin ? (
             <>
               <p className="text-sm text-muted-foreground">
                 No organizations yet. As a Super Admin you can provision the first one.

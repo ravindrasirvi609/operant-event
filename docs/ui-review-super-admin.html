@@ -1,0 +1,341 @@
+<title>Org Creation UI Review</title>
+<style>
+  /*
+    Layout concept: a short verification summary up top, then three
+    browser-chrome mockup frames in a responsive grid — each one a faithful
+    reproduction of a real route using Operant Event's actual design tokens
+    (oklch palette, Geist-style grotesque, rounded-xl surfaces, brand blue).
+  */
+  :root {
+    --bg: oklch(1 0 0);
+    --fg: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-fg: oklch(0.145 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-fg: oklch(0.556 0 0);
+    --border: oklch(0.922 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-fg: oklch(0.985 0 0);
+    --brand: oklch(0.51 0.225 264);
+    --brand-fg: oklch(1 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --ok: oklch(0.52 0.15 150);
+    --radius: 0.625rem;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: oklch(0.145 0 0);
+      --fg: oklch(0.985 0 0);
+      --card: oklch(0.205 0 0);
+      --card-fg: oklch(0.985 0 0);
+      --muted: oklch(0.269 0 0);
+      --muted-fg: oklch(0.708 0 0);
+      --border: oklch(1 0 0 / 12%);
+      --primary: oklch(0.922 0 0);
+      --primary-fg: oklch(0.205 0 0);
+      --brand: oklch(0.62 0.21 264);
+      --brand-fg: oklch(1 0 0);
+      --destructive: oklch(0.704 0.191 22.216);
+      --ok: oklch(0.72 0.17 150);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: oklch(0.145 0 0);
+    --fg: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-fg: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-fg: oklch(0.708 0 0);
+    --border: oklch(1 0 0 / 12%);
+    --primary: oklch(0.922 0 0);
+    --primary-fg: oklch(0.205 0 0);
+    --brand: oklch(0.62 0.21 264);
+    --brand-fg: oklch(1 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --ok: oklch(0.72 0.17 150);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding-inline: 16px;
+    padding-block: 28px 48px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance; }
+  .lede { color: var(--muted-fg); font-size: 0.9rem; max-width: 560px; line-height: 1.55; margin: 0; }
+
+  .theme-toggle {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .theme-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  /* ── Verification checklist ──────────────────────────────────────────── */
+  .checklist {
+    margin-top: 22px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.4);
+    background: var(--card);
+    padding: 18px 20px;
+  }
+  .checklist h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-fg);
+    margin: 0 0 12px;
+    font-weight: 600;
+  }
+  .check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px 24px;
+  }
+  .check-item { display: flex; gap: 9px; align-items: flex-start; font-size: 0.84rem; line-height: 1.45; }
+  .check-dot {
+    flex: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--ok);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    margin-top: 1px;
+  }
+  .check-item.fixed .check-dot { background: var(--brand); }
+  .check-tag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--brand);
+    display: block;
+  }
+  .check-item.fixed .check-tag { color: var(--brand); }
+
+  /* ── Mockup grid ──────────────────────────────────────────────────────── */
+  .mock-grid {
+    margin-top: 30px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 22px;
+    align-items: start;
+  }
+  .mock-caption { font-size: 0.78rem; color: var(--muted-fg); margin: 10px 2px 0; line-height: 1.4; }
+  .mock-caption b { color: var(--fg); font-weight: 600; }
+
+  .frame {
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.4);
+    overflow: hidden;
+    background: var(--card);
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.04);
+  }
+  .frame-bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 12px;
+    background: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .frame-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+  .frame-url {
+    margin-left: 6px;
+    font-size: 0.72rem;
+    color: var(--muted-fg);
+    font-family: ui-monospace, 'SF Mono', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .frame-body { padding: 22px; min-height: 150px; }
+
+  /* ── Shared "app" styling, matching the real tokens ──────────────────── */
+  .app-h1 { font-size: 1.05rem; font-weight: 600; margin: 0 0 8px; }
+  .app-muted { color: var(--muted-fg); font-size: 0.825rem; line-height: 1.5; margin: 0; }
+  .app-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+    padding: 7px 14px;
+    border-radius: calc(var(--radius) * 1.4);
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-size: 0.82rem;
+    font-weight: 500;
+    border: none;
+    cursor: default;
+  }
+  .skel-line {
+    margin-top: 12px;
+    height: 14px;
+    width: 68%;
+    border-radius: 5px;
+    background: var(--muted);
+    position: relative;
+    overflow: hidden;
+  }
+  .skel-line::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.35), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .skel-line::after { animation: none; } }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  .app-field { margin-top: 14px; }
+  .app-field label { display: block; font-size: 0.78rem; font-weight: 500; margin-bottom: 5px; }
+  .app-field input {
+    width: 100%;
+    height: 32px;
+    border-radius: calc(var(--radius) * 1.4);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    padding-inline: 10px;
+    font-size: 0.8rem;
+  }
+  .app-field input::placeholder { color: var(--muted-fg); }
+
+  .app-fieldset {
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.4);
+    padding: 12px 14px 14px;
+  }
+  .app-legend {
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--muted-fg);
+    margin-bottom: 6px;
+  }
+  .app-note { font-size: 0.7rem; color: var(--muted-fg); line-height: 1.4; margin: 0 0 8px; }
+
+  footer {
+    margin-top: 36px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--muted-fg);
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650&display=swap">
+
+<div class="top">
+  <div>
+    <h1>Org creation UI — review</h1>
+    <p class="lede">
+      Visual check of every screen touched by the "only Super Admin can create an organization" change,
+      plus the two loading-state bugs found and fixed during this review.
+    </p>
+  </div>
+  <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+</div>
+
+<div class="checklist">
+  <h2>What was checked</h2>
+  <div class="check-grid">
+    <div class="check-item"><span class="check-dot">✓</span><span>Org switcher and top nav carry no leftover "create organization" link — only the gated dashboard button and the route itself can reach the form.</span></div>
+    <div class="check-item"><span class="check-dot">✓</span><span><code>/organizations/new</code> redirects any non–Super Admin to <code>/</code> before the form renders.</span></div>
+    <div class="check-item"><span class="check-dot">✓</span><span>Form fields mirror the API DTO exactly — organization details plus a dedicated owner-provisioning fieldset.</span></div>
+    <div class="check-item fixed"><span class="check-tag">Fixed</span><span>Dashboard empty state could flash "ask your administrator" to a Super Admin for a moment, before their profile finished loading. Now shows a skeleton line until the profile resolves.</span></div>
+    <div class="check-item fixed"><span class="check-tag">Fixed</span><span><code>/organizations/new</code> rendered a blank white page while checking Super Admin status. Now shows a spinner instead of nothing.</span></div>
+  </div>
+</div>
+
+<div class="mock-grid">
+
+  <div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
+        <span class="frame-url">operant.app/</span>
+      </div>
+      <div class="frame-body">
+        <p class="app-h1">Welcome to Operant Event</p>
+        <p class="app-muted">No organizations yet. As a Super Admin you can provision the first one.</p>
+        <button class="app-btn">▦ Create an organization</button>
+      </div>
+    </div>
+    <p class="mock-caption"><b>Dashboard — signed in as Super Admin.</b> Shown only once their profile has loaded; no empty button or flash of the wrong message.</p>
+  </div>
+
+  <div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
+        <span class="frame-url">operant.app/</span>
+      </div>
+      <div class="frame-body">
+        <p class="app-h1">Welcome to Operant Event</p>
+        <p class="app-muted">You haven't been added to any organization yet. Ask your organization administrator for an invitation.</p>
+      </div>
+    </div>
+    <p class="mock-caption"><b>Dashboard — signed in as a regular user.</b> No button, no link, no way to reach <code>/organizations/new</code> from here.</p>
+  </div>
+
+  <div>
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="frame-dot"></span><span class="frame-dot"></span><span class="frame-dot"></span>
+        <span class="frame-url">operant.app/organizations/new</span>
+      </div>
+      <div class="frame-body">
+        <p class="app-h1">Create an organization</p>
+        <p class="app-muted">Provision a new organization and designate its first owner.</p>
+        <div class="app-field"><label>Organization name</label><input placeholder="" readonly></div>
+        <div class="app-field"><label>Slug (optional)</label><input placeholder="auto-generated if left blank" readonly></div>
+        <div class="app-fieldset">
+          <div class="app-legend">Organization Owner account</div>
+          <p class="app-note">If no account exists for this email, one will be created and a set-password link will be sent automatically.</p>
+          <div class="app-field" style="margin-top:0"><label>Owner email</label><input placeholder="" readonly></div>
+        </div>
+        <button class="app-btn" style="margin-top:14px">Create organization</button>
+      </div>
+    </div>
+    <p class="mock-caption"><b>The form itself — Super Admin only.</b> Contact fields and website omitted here for space; the live form has five org fields plus three owner fields.</p>
+  </div>
+
+</div>
+
+<footer>
+  Reproduced from <code>apps/web/app/(dashboard)/page.tsx</code> and <code>apps/web/app/(dashboard)/organizations/new/page.tsx</code>
+  using the app's real design tokens (oklch palette, <code>--radius</code> scale, brand blue). Not a live connection to the API.
+</footer>
+
+<script>
+  (function () {
+    try {
+      var btn = document.getElementById('themeToggle');
+      var root = document.documentElement;
+      var saved = localStorage.getItem('ui-review-theme');
+      if (saved) root.setAttribute('data-theme', saved);
+      btn.addEventListener('click', function () {
+        var current = root.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : current === 'light' ? null : 'dark';
+        if (next) root.setAttribute('data-theme', next);
+        else root.removeAttribute('data-theme');
+        try { localStorage.setItem('ui-review-theme', next || ''); } catch (e) {}
+      });
+    } catch (e) {}
+  })();
+</script>
