@@ -70,13 +70,23 @@ Operant Event is built around two broad groups of people: the **team that organi
 
 ![Who Uses Operant Event](images/diagram1_roles.png)
 
-### Your Organizing Team
+### Platform Super Admin
 
-These are the people inside your organization (your society, university, or event company) who plan and run the show. They log in to a shared organizer back-office and see only the conferences that belong to their organization.
+Before any organizing team can exist, the platform itself needs to be set up by a **Platform Super Admin**. This is a special account held by whoever operates the Operant Event platform for your organization (typically your IT team or service provider). The Super Admin sits above all organizations and has one exclusive job: **creating new organizations** on the platform and designating each one's first owner.
 
 | Role | In plain terms |
 |---|---|
-| **Organization Owner** | The person who created the workspace, or someone promoted to full control. Can do absolutely everything, including deciding who else gets which powers. Every organization has at least one. |
+| **Platform Super Admin** | The platform operator. Creates new organizations (workspaces) and provisions their first Organization Owner. Does not participate in the day-to-day running of any individual conference. There is only one Super Admin account per platform deployment. |
+
+> **If you're setting up a new organization:** You don't self-register as an owner. Instead, ask the person who runs the Operant Event platform for your institution (your IT team or platform administrator) to provision a new organization for you. They will create it and send you an invitation email to set your password and take ownership of your new workspace.
+
+### Your Organizing Team
+
+Once an organization has been created, *these* are the people inside your organization (your society, university, or event company) who plan and run the show. They log in to a shared organizer back-office and see only the conferences that belong to their organization.
+
+| Role | In plain terms |
+|---|---|
+| **Organization Owner** | The person designated as the first owner when the workspace was created, or someone later promoted to full control. Can do absolutely everything within the organization, including deciding who else gets which powers. Every organization has at least one. |
 | **Organization Admin** | Almost as powerful as the Owner — can manage every part of every conference and the whole team — except they cannot hand out roles or change who has ownership-level control. |
 | **Conference Admin** | The day-to-day event manager. Runs registration, payments, the programme, check-in, certificates, sponsors, and reporting for the conferences they're assigned to. Does not handle the academic review side. |
 | **Track Chair** | The academic/scientific lead. Manages the reviewer pool, assigns papers to reviewers, and makes the final accept/reject decisions. Does not handle money or logistics. |
@@ -117,14 +127,18 @@ A single person can move between several of these without any extra effort — f
 
 ## 4. Getting Started: Creating Your Account
 
-Everyone — whether they will organize events or simply attend one — starts the same way: with a personal account.
+Most people — authors, reviewers, attendees, and organizing team members — create a personal account through the public sign-up page. Organization workspaces are set up separately by the Platform Super Admin (see [Section 2](#2-who-uses-this-application)).
+
+**Creating a personal account (for authors, reviewers, attendees, and most organizers):**
 
 1. **Go to the sign-up page.** Your organization will share a link, or you may arrive there automatically after clicking "Register" on a conference's public page.
 2. **Enter your name, email address, and a password.** Passwords must be reasonably strong; the system will tell you immediately if yours is too weak.
 3. **Check your inbox.** You'll receive a welcome email confirming your account is active.
 4. **Sign in.** From now on, this one login works everywhere in Operant Event — as an author, a reviewer, a delegate, or (if invited) as part of an organizing team.
 
-**If you were invited by an organizer:** You'll instead receive an email invitation with a special link. Clicking it lets you set your password and immediately drops you into the organizer back-office with whatever role you were invited to hold. You never need to separately "sign up" first.
+**If you are the designated owner of a new organization:** You will receive a special invitation email from the Platform Super Admin when they create your organization. Clicking the link in that email lets you set your password and immediately gives you full Organization Owner access to your new workspace — no separate sign-up step needed.
+
+**If you were invited to join an existing organization's team:** You'll receive an email invitation with a special link. Clicking it lets you set your password and immediately drops you into the organizer back-office with whatever role you were invited to hold.
 
 **Forgotten your password?** Use the "Forgot password" link on the sign-in page. You'll get a reset email with a secure, time-limited link — for your protection, it only works for a short window and only once.
 
@@ -138,7 +152,9 @@ An **Organization** is the umbrella workspace for everything your society, unive
 
 ### Creating an Organization
 
-The first person to set things up creates the organization — giving it a name and a few basic details (a short "slug" used in web addresses, a logo, and contact information). That person automatically becomes the **Organization Owner**.
+Organizations are created by the **Platform Super Admin** — the person or team responsible for operating the Operant Event platform. The Super Admin fills in the organization's basic details (name, a short "slug" used in web addresses, and contact information), and specifies who the first **Organization Owner** should be. If that person does not yet have an account, the system creates one automatically and sends them a set-password email so they can log in and take ownership immediately.
+
+**In short: you cannot self-create an organization.** If you need a new workspace provisioned, contact your platform administrator.
 
 ### What Lives Inside an Organization
 
@@ -693,11 +709,13 @@ Operant Event stores the personal information you provide (name, email, affiliat
 
 This section is a complete listing of every individual capability in the system. Most users will never need to read this — it's intended as a reference for Organization Owners who want to create custom roles, or for team members who want to understand exactly what they can and cannot do.
 
-**How to read this table:** Each row is one individual capability (permission). A tick (✅) means the built-in role has this capability. A dash (—) means they don't, by default. A custom role can be given any subset of these.
+**How to read this table:** Each row is one individual capability (permission). A tick (✅) means the built-in role has this capability. A dash (—) means they don't, by default. A custom role can be given any subset of the organization-level permissions.
+
+> **Note on the Platform Super Admin:** Creating a new organization is an exclusive capability of the **Platform Super Admin** — a platform-level account that sits above all organizations. It is not part of the organization role system and cannot be delegated or granted to an Organization Owner. The table below covers only organization-level roles.
 
 | Capability | Org Owner | Org Admin | Conf Admin | Track Chair |
 |---|:---:|:---:|:---:|:---:|
-| Create a new organization | ✅ | — | — | — |
+| Create a new organization | Platform Super Admin only — see note above | — | — | — |
 | Edit organization settings (name, branding, billing) | ✅ | ✅ | — | — |
 | View all organization members | ✅ | ✅ | — | — |
 | Invite a new team member | ✅ | ✅ | — | — |
@@ -750,7 +768,6 @@ Operant Event is actively growing, and there are a number of things that are del
 | **Sponsor / exhibitor self-service portal** | Sponsors and exhibitors cannot log in themselves. All their information is managed by the organizing team. |
 | **Audit log viewer** | Changes to important records (decisions, payment confirmations, role changes) are stored internally, but there is no screen to browse this history yet. |
 | **Report date-range filtering** | Reports show all-time data; you cannot filter a report to show only, say, registrations from the past 30 days. |
-| **Platform super-admin console** | There is no graphical admin panel for the platform itself (only accessible to your technical team via server tools). |
 | **Waitlist auto-promotion** | Waitlisted registrants must be manually moved to registered if a spot opens; the system does not automatically promote them. |
 | **Abstract co-author notifications** | Co-authors listed on a submission do not automatically receive status-change emails; only the primary submitting author does. |
 | **In-app messaging** | There is no real-time chat or messaging between organizers and authors/reviewers within the platform. Communication beyond automatic emails uses your normal email client. |
@@ -759,6 +776,16 @@ Operant Event is actively growing, and there are a number of things that are del
 
 **Q: Is Operant Event free to use?**
 Pricing for organizations is set by your platform administrator. For delegates, authors, and reviewers, creating a personal account is free. Whether you pay to attend a conference depends on the organizer's registration fees, not on the platform itself.
+
+---
+
+**Q: How do I get a new organization set up on the platform?**
+You cannot create an organization yourself — this is intentional. Only the **Platform Super Admin** (the team or person who runs the Operant Event installation for your institution) can provision new organizations. Contact your IT department or platform administrator and ask them to create an organization for you. They will enter the organization's name, contact details, and your email address as the first owner. You'll then receive an email with a link to set your password and get started.
+
+---
+
+**Q: I received an "invitation to set your password" email — what is that?**
+It means either the Platform Super Admin has just created a new organization and designated you as its first owner, or an existing Organization Owner has invited you to join their team. Click the link in the email (it is valid for 7 days), set your password, and you'll be taken directly into the back-office with whatever access you were given. If the link has expired, ask the person who invited you to send a new one.
 
 ---
 
@@ -884,7 +911,8 @@ This glossary defines the words Operant Event uses and explains what they mean i
 
 | I am a… | My first step | My main section |
 |---|---|---|
-| **Conference organizer (new)** | Create an organization, then create your first conference | Sections 5, 8 |
+| **Platform Super Admin** | Log in with your Super Admin account; create a new organization | Section 2, 5 |
+| **Conference organizer (new Organization Owner)** | Accept your invitation email, set your password, then create your first conference | Sections 4, 5, 8 |
 | **Track Chair** | Open your conference track, add reviewers | Sections 9, 11 |
 | **Author submitting a paper** | Sign in (or create account), find the conference submission link | Section 10 |
 | **Reviewer** | Accept the invitation email, open "My Reviews" | Section 11 |
@@ -896,5 +924,5 @@ This glossary defines the words Operant Event uses and explains what they mean i
 
 *Thank you for using Operant Event. We hope your conference is a great success.*
 
-*This document was last updated: September 2026.*
+*This document was last updated: October 2026.*
 

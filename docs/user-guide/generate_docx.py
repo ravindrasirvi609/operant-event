@@ -287,17 +287,47 @@ body(
 )
 add_image(doc, "diagram1_roles.png", "Figure 1 — Everyone who uses Operant Event and the role they play")
 
+h3("Platform Super Admin")
+body(
+    "Before any organizing team can exist, the platform itself needs to be set up by a Platform "
+    "Super Admin. This is a special account held by whoever operates the Operant Event platform "
+    "for your organization (typically your IT team or service provider). The Super Admin sits "
+    "above all organizations and has one exclusive job: creating new organizations on the platform "
+    "and designating each one's first owner."
+)
+t_sa = doc.add_table(rows=2, cols=2)
+t_sa.style = "Table Grid"
+for i, (h_val, v_val) in enumerate([
+    ("Role", "In plain terms"),
+    ("Platform Super Admin",
+     "The platform operator. Creates new organizations and provisions their first Organization Owner. "
+     "Does not participate in the day-to-day running of any individual conference. There is only one "
+     "Super Admin account per platform deployment."),
+]):
+    row = t_sa.rows[i]
+    row.cells[0].text = h_val
+    row.cells[1].text = v_val
+style_table(t_sa)
+doc.add_paragraph()
+add_callout(
+    doc,
+    "If you're setting up a new organization: ask the person who runs the Operant Event platform "
+    "for your institution to provision a new organization for you. They will create it and send you "
+    "an invitation email to set your password and take ownership of your new workspace."
+)
+
 h3("Your Organizing Team")
 body(
-    "These are the people inside your organization (your society, university, or event company) "
-    "who plan and run the show. They log in to a shared organizer back-office."
+    "Once an organization has been created, these are the people inside your organization (your "
+    "society, university, or event company) who plan and run the show. They log in to a shared "
+    "organizer back-office."
 )
 t = doc.add_table(rows=5, cols=2)
 t.style = "Table Grid"
-headers = ["Role", "In plain terms"]
 rows_data = [
     ("Organization Owner",
-     "The person who created the workspace, or someone promoted to full control. Can do absolutely everything, including deciding who else gets which powers."),
+     "The person designated as the first owner when the workspace was created, or someone later "
+     "promoted to full control. Can do absolutely everything, including deciding who else gets which powers."),
     ("Organization Admin",
      "Almost as powerful as the Owner — can manage every part of every conference and the whole team — except they cannot hand out or change high-level roles."),
     ("Conference Admin",
@@ -305,10 +335,10 @@ rows_data = [
     ("Track Chair",
      "The academic/scientific lead. Manages the reviewer pool, assigns papers to reviewers, and makes final accept/reject decisions. Does not handle money or logistics."),
 ]
-for i, (h, v) in enumerate([("Role", "In plain terms")] + rows_data):
+for i, (h_val, v_val) in enumerate([("Role", "In plain terms")] + rows_data):
     row = t.rows[i]
-    row.cells[0].text = h
-    row.cells[1].text = v
+    row.cells[0].text = h_val
+    row.cells[1].text = v_val
 style_table(t)
 doc.add_paragraph()
 
@@ -365,7 +395,12 @@ add_horizontal_rule(doc)
 
 # ── Section 4 ──────────────────────────────────────────────────────────────
 h1("4. Getting Started: Creating Your Account")
-body("Everyone starts the same way — with a free personal account.")
+body(
+    "Most people — authors, reviewers, attendees, and organizing team members — create a personal "
+    "account through the public sign-up page. Organization workspaces are set up separately by the "
+    "Platform Super Admin (see Section 2)."
+)
+h3("Creating a personal account")
 steps = [
     "Go to the sign-up page (shared by your organizer, or linked from a conference's public page).",
     "Enter your name, email address, and a password. The system tells you immediately if your password is too weak.",
@@ -379,9 +414,15 @@ for i, s in enumerate(steps, 1):
     p.add_run(s)
 
 body(
-    "If you were invited by an organizer: you'll receive an invitation email with a special link. "
-    "Clicking it lets you set your password and immediately access the organizer back-office with "
-    "the role you were invited to hold."
+    "If you are the designated owner of a new organization: you will receive a special invitation "
+    "email from the Platform Super Admin when they create your organization. Clicking the link "
+    "lets you set your password and immediately gives you full Organization Owner access — no "
+    "separate sign-up step needed."
+)
+body(
+    "If you were invited to join an existing organization's team: you'll receive an invitation "
+    "email with a special link. Clicking it lets you set your password and immediately drops you "
+    "into the organizer back-office with whatever role you were invited to hold."
 )
 body(
     "One account, many hats: the same email and password can be an Organization Owner for your "
@@ -395,6 +436,18 @@ h1("5. Your Organization: The Workspace Behind Every Event")
 body(
     "An Organization is the umbrella workspace for everything your society, university department, "
     "or event company does in Operant Event. Every conference belongs to exactly one organization."
+)
+h3("Creating an Organization")
+body(
+    "Organizations are created by the Platform Super Admin — the person or team responsible for "
+    "operating the Operant Event platform. The Super Admin fills in the organization's basic "
+    "details and specifies who the first Organization Owner should be. If that person does not "
+    "yet have an account, the system creates one automatically and sends them a set-password email."
+)
+add_callout(
+    doc,
+    "You cannot self-create an organization. If you need a new workspace provisioned, contact "
+    "your platform administrator."
 )
 h3("What Lives Inside an Organization")
 items = [
@@ -760,10 +813,17 @@ add_horizontal_rule(doc)
 # ── Section 21 ──────────────────────────────────────────────────────────────
 h1("21. Roles and Permissions Reference")
 body("This is a complete listing of every individual capability. Most users will never need this section — it's for Organization Owners creating custom roles, or team members wanting to understand their access exactly.")
+add_callout(
+    doc,
+    "Creating a new organization is an exclusive capability of the Platform Super Admin — a "
+    "platform-level account that sits above all organizations. It is not part of the organization "
+    "role system and cannot be delegated or granted to an Organization Owner. The table below "
+    "covers only organization-level roles."
+)
 
 perm_rows = [
     ("Capability", "Owner", "Admin", "Conf Admin", "Track Chair"),
-    ("Create a new organization", "✅", "—", "—", "—"),
+    ("Create a new organization", "Super Admin only", "—", "—", "—"),
     ("Edit organization settings", "✅", "✅", "—", "—"),
     ("Invite / remove team members", "✅", "✅", "—", "—"),
     ("Change a team member's role", "✅", "—", "—", "—"),
@@ -821,7 +881,7 @@ limits = [
     ("Sponsor / exhibitor self-service portal", "Their information is managed entirely by the organizing team."),
     ("Audit log viewer", "Changes are stored internally but there is no screen to browse the history."),
     ("Report date-range filtering", "Reports show all-time data; filtering to a date range is not yet available."),
-    ("Waitlist auto-promotion", "Waitlisted registrants must be manually moved to registered."),
+    ("Waitlist auto-promotion", "Waitlisted registrants must be manually moved to registered if a spot opens."),
     ("Co-author notifications", "Only the primary submitting author receives status-change emails."),
     ("In-app messaging", "No real-time chat within the platform."),
 ]
@@ -851,6 +911,10 @@ h1("23. Frequently Asked Questions")
 faqs = [
     ("Is Operant Event free to use?",
      "Pricing for organizations is set by your platform administrator. For delegates, authors, and reviewers, creating a personal account is free. Whether you pay to attend depends on the organizer's fees."),
+    ("How do I get a new organization set up on the platform?",
+     "You cannot create an organization yourself — this is intentional. Only the Platform Super Admin can provision new organizations. Contact your IT department or platform administrator and ask them to create one for you. They will enter the details and designate you as the first owner; you'll then receive an invitation email."),
+    ("I received an 'invitation to set your password' email — what is that?",
+     "It means the Platform Super Admin has created a new organization and designated you as its first owner, or an existing Organization Owner has invited you to join their team. Click the link (valid for 7 days), set your password, and you'll be taken directly into the back-office. If the link has expired, ask the person who invited you to send a new one."),
     ("I can't find the conference I want to register for.",
      "Ask the organizer to share the direct link. Conferences are not in a public directory by default."),
     ("My paper shows as 'Submitted' — has anyone looked at it yet?",
@@ -956,7 +1020,8 @@ add_horizontal_rule(doc)
 h1("Quick Reference: Who Does What")
 qr_rows = [
     ("I am a…", "My first step", "My main section"),
-    ("Conference organizer (new)", "Create an organization, then create your first conference", "Sections 5, 8"),
+    ("Platform Super Admin", "Log in with your Super Admin account; create a new organization", "Sections 2, 5"),
+    ("Conference organizer (new Organization Owner)", "Accept your invitation email, set your password, then create your first conference", "Sections 4, 5, 8"),
     ("Track Chair", "Open your conference track, add reviewers", "Sections 9, 11"),
     ("Author submitting a paper", "Sign in (or create account), click the submission link", "Section 10"),
     ("Reviewer", "Accept the invitation email, open 'My Reviews'", "Section 11"),
@@ -984,7 +1049,7 @@ doc.add_paragraph()
 add_horizontal_rule(doc)
 p_foot = doc.add_paragraph()
 p_foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_foot = p_foot.add_run("Thank you for using Operant Event. We hope your conference is a great success.\nThis document was last updated: September 2026.")
+r_foot = p_foot.add_run("Thank you for using Operant Event. We hope your conference is a great success.\nThis document was last updated: October 2026.")
 r_foot.italic = True
 r_foot.font.size = Pt(9)
 r_foot.font.color.rgb = RGBColor(0x77, 0x77, 0x77)
