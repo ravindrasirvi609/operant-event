@@ -1,3 +1,4 @@
+
 import {
   IsDateString,
   IsInt,
@@ -8,9 +9,28 @@ import {
 } from 'class-validator';
 
 export class AssignPresentationDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  abstractId!: string;
+  abstractId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  speakerId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  speakerName?: string;
+
+  @IsOptional()
+  @IsString()
+  speakerAffiliation?: string;
 
   @IsOptional()
   @IsString()

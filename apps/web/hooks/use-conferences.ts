@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPatch, apiPost } from '@/lib/api/client';
+import { useActiveOrganization } from './use-active-organization';
 import type { Conference, ConferenceStatus } from '@/lib/conferences/types';
 
 const CONFERENCES_QUERY_KEY = ['conferences'];
@@ -11,9 +12,12 @@ function conferenceQueryKey(conferenceId: string) {
 }
 
 export function useConferences() {
+  const { activeOrgId } = useActiveOrganization();
+
   return useQuery({
-    queryKey: CONFERENCES_QUERY_KEY,
+    queryKey: [...CONFERENCES_QUERY_KEY, activeOrgId],
     queryFn: () => apiGet<Conference[]>('conferences'),
+    enabled: Boolean(activeOrgId),
   });
 }
 
@@ -42,44 +46,77 @@ export interface ConferenceFormInput {
 
 export function useCreateConference() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (input: ConferenceFormInput) => apiPost<Conference>('conferences', input),
+    mutationFn: (input: ConferenceFormInput) =>
+      apiPost<Conference>('conferences', input),
+
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CONFERENCES_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: CONFERENCES_QUERY_KEY,
+      });
     },
   });
 }
 
 export function useUpdateConference(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (input: Partial<ConferenceFormInput>) => apiPatch<Conference>(`conferences/${conferenceId}`, input),
+    mutationFn: (input: Partial<ConferenceFormInput>) =>
+      apiPatch<Conference>(`conferences/${conferenceId}`, input),
+
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conferenceQueryKey(conferenceId) });
-      void queryClient.invalidateQueries({ queryKey: CONFERENCES_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: conferenceQueryKey(conferenceId),
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: CONFERENCES_QUERY_KEY,
+      });
     },
   });
 }
 
 export function useChangeConferenceStatus(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (status: ConferenceStatus) =>
-      apiPatch<Conference>(`conferences/${conferenceId}/status`, { status }),
+      apiPatch<Conference>(
+        `conferences/${conferenceId}/status`,
+        { status },
+      ),
+
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conferenceQueryKey(conferenceId) });
-      void queryClient.invalidateQueries({ queryKey: CONFERENCES_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: conferenceQueryKey(conferenceId),
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: CONFERENCES_QUERY_KEY,
+      });
     },
   });
 }
 
 export function usePublishConference(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: () => apiPost<Conference>(`conferences/${conferenceId}/publish`),
+    mutationFn: () =>
+      apiPost<Conference>(
+        `conferences/${conferenceId}/publish`,
+      ),
+
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conferenceQueryKey(conferenceId) });
-      void queryClient.invalidateQueries({ queryKey: CONFERENCES_QUERY_KEY });
+      void queryClient.invalidateQueries({
+        queryKey: conferenceQueryKey(conferenceId),
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey: CONFERENCES_QUERY_KEY,
+      });
     },
   });
 }

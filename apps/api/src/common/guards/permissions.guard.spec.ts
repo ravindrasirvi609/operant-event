@@ -23,9 +23,19 @@ function buildGuard(
   return { guard, context };
 }
 
+
 function fakePrisma(findUnique: jest.Mock) {
-  return { organizationMembership: { findUnique } } as unknown as PrismaService;
+  return {
+    organizationMembership: { findUnique },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ isSuperAdmin: false }),
+    },
+    organization: {
+      findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+    },
+  } as unknown as PrismaService;
 }
+
 
 function activeMembershipWithPermissions(
   ...permissions: Array<{ module: string; action: string }>

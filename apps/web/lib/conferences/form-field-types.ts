@@ -11,6 +11,7 @@ export const FORM_FIELD_TYPES = [
   'CHECKBOX',
   'FILE',
   'URL',
+  'AUTHOR_BLOCK',
 ] as const;
 
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];

@@ -11,13 +11,32 @@ import { decideRouteAccess } from '@/lib/auth/route-protection';
 // logic exists.
 export function proxy(request: NextRequest) {
   const hasSession = Boolean(
-    request.cookies.get(ACCESS_TOKEN_COOKIE)?.value || request.cookies.get(REFRESH_TOKEN_COOKIE)?.value,
+    request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ||
+      request.cookies.get(REFRESH_TOKEN_COOKIE)?.value,
   );
+
   const decision = decideRouteAccess(request.nextUrl.pathname, hasSession);
 
   if (decision.action === 'redirect') {
-    return NextResponse.redirect(new URL(decision.to, request.url));
+    const redirectUrl = new URL(decision.to, request.url);
+
+    // Preserve the page the user originally wanted to visit.
+    // Example:
+    // /my-abstracts -> /login?returnTo=/my-abstracts
+    //
+    // This allows the same account to act as both Author and Reviewer:
+    // /my-abstracts -> login -> /my-abstracts
+    // /my-reviews  -> login -> /my-reviews
+    if (decision.to === '/login') {
+      redirectUrl.searchParams.set(
+        'returnTo',
+        request.nextUrl.pathname + request.nextUrl.search,
+      );
+    }
+
+    return NextResponse.redirect(redirectUrl);
   }
+
   return NextResponse.next();
 }
 

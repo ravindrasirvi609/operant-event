@@ -168,15 +168,23 @@ describe('PresentationsService.assign', () => {
     });
 
     expect(create).toHaveBeenCalledWith({
-      data: {
-        sessionId: 'session-1',
-        abstractId: 'abstract-1',
-        presentationType: 'ORAL',
-        startTime: new Date(presentationWindow.startTime),
-        endTime: new Date(presentationWindow.endTime),
-        sortOrder: 2,
-      },
-    });
+  data: {
+    title: undefined,
+    speakerName: null,
+    speakerAffiliation: null,
+    sessionId: 'session-1',
+    abstractId: 'abstract-1',
+    presentationType: 'ORAL',
+    startTime: new Date('2027-01-01T10:00:00.000Z'),
+    endTime: new Date('2027-01-01T10:30:00.000Z'),
+    sortOrder: 2,
+    speakerId: null,
+  },
+  include: {
+    abstract: true,
+    speaker: true,
+  },
+});
   });
 
   it('translates a unique-constraint collision into a ConflictException', async () => {
@@ -226,11 +234,17 @@ describe('PresentationsService.findAllForSession', () => {
     await service.findAllForSession('org-1', 'session-1');
 
     expect(findMany).toHaveBeenCalledWith({
-      where: { sessionId: 'session-1' },
-      include: { abstract: true },
-      orderBy: { sortOrder: 'asc' },
-    });
-  });
+  where: { sessionId: 'session-1' },
+  include: {
+    abstract: true,
+    speaker: true,
+  },
+  orderBy: [
+    { startTime: 'asc' },
+    { sortOrder: 'asc' },
+  ],
+});
+});
 });
 
 const presentationAssignment = {
@@ -294,14 +308,18 @@ describe('PresentationsService.update', () => {
       },
     );
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'assignment-1' },
-      data: {
-        presentationType: 'POSTER',
-        sortOrder: 3,
-        startTime: presentationAssignment.startTime,
-        endTime: presentationAssignment.endTime,
-      },
-    });
+  where: { id: 'assignment-1' },
+  data: {
+    presentationType: 'POSTER',
+    startTime: presentationAssignment.startTime,
+    endTime: presentationAssignment.endTime,
+    sortOrder: 3,
+  },
+  include: {
+    abstract: true,
+    speaker: true,
+  },
+});
   });
 });
 

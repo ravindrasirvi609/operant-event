@@ -30,17 +30,39 @@ export class NotificationsService {
     });
   }
 
-  findMine(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+    findMine(userId: string) {
+  return this.prisma.notification.findMany({
+    where: {
+      userId,
+      clearedAt: null,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+async clearMine(userId: string) {
+  const result = await this.prisma.notification.updateMany({
+    where: {
+      userId,
+      clearedAt: null,
+    },
+    data: {
+      clearedAt: new Date(),
+    },
+  });
+
+  return { clearedCount: result.count };
+}
+
 
   async markRead(userId: string, notificationId: string) {
     const notification = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId },
-    });
+  where: {
+    id: notificationId,
+    userId,
+    clearedAt: null,
+  },
+});
     if (!notification) {
       throw new NotFoundException('Notification not found.');
     }

@@ -26,11 +26,21 @@ export interface SessionSpeaker {
 export interface PresentationAssignment {
   id: string;
   sessionId: string;
-  abstractId: string;
+  abstractId: string | null;
+  speakerId: string | null;
+  title: string | null;
+  speakerName: string | null;
+  speakerAffiliation: string | null;
   presentationType: string | null;
   startTime: string;
   endTime: string;
   sortOrder: number;
+  abstract?: {
+    id?: string;
+    title: string;
+    submissionNumber: string | null;
+  } | null;
+  speaker?: Speaker | null;
 }
 
 /**

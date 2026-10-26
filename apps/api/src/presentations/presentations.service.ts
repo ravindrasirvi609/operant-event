@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ConflictException,
@@ -17,6 +18,29 @@ export class PresentationsService {
     private readonly scheduleConflictService: ScheduleConflictService,
   ) {}
 
+  private async validateSpeaker(
+    speakerId: string | null | undefined,
+    conferenceId: string,
+  ) {
+    if (!speakerId) {
+      return;
+    }
+
+    const speaker = await this.prisma.speaker.findFirst({
+      where: {
+        id: speakerId,
+        conferenceId,
+      },
+      select: { id: true },
+    });
+
+    if (!speaker) {
+      throw new BadRequestException(
+        'Selected presenter does not belong to this conference.',
+      );
+    }
+  }
+
   async assign(
     organizationId: string,
     sessionId: string,
@@ -25,46 +49,82 @@ export class PresentationsService {
     const session = await this.prisma.programSession.findFirst({
       where: { id: sessionId, conference: { organizationId } },
     });
+
     if (!session) {
       throw new NotFoundException('Session not found.');
     }
 
-    const abstract = await this.prisma.abstract.findFirst({
-      where: { id: dto.abstractId, conferenceId: session.conferenceId },
-    });
-    if (!abstract) {
-      throw new NotFoundException('Abstract not found in this conference.');
-    }
-    if (abstract.status !== 'ACCEPTED') {
+    const abstractId = dto.abstractId?.trim() || null;
+    const title = dto.title?.trim() || null;
+    const speakerName = dto.speakerName?.trim() || null;
+    const speakerAffiliation = dto.speakerAffiliation?.trim() || null;
+
+    if (!abstractId && !title) {
       throw new BadRequestException(
-        'Only an ACCEPTED abstract can be scheduled into a session.',
+        'Select an abstract or enter a presentation title.',
       );
     }
 
+    let abstractTitle: string | null = null;
+
+    if (abstractId) {
+      const abstract = await this.prisma.abstract.findFirst({
+        where: {
+          id: abstractId,
+          conferenceId: session.conferenceId,
+        },
+      });
+
+      if (!abstract) {
+        throw new NotFoundException(
+          'Abstract not found in this conference.',
+        );
+      }
+
+      if (abstract.status !== 'ACCEPTED') {
+        throw new BadRequestException(
+          'Only an ACCEPTED abstract can be scheduled into a session.',
+        );
+      }
+
+      abstractTitle = abstract.title;
+    }
+
+    await this.validateSpeaker(dto.speakerId, session.conferenceId);
+
     const startTime = new Date(dto.startTime);
     const endTime = new Date(dto.endTime);
+
     this.scheduleConflictService.assertPresentationWithinSession(session, {
       startTime,
       endTime,
     });
-    await this.scheduleConflictService.assertNoAbstractDoubleBooking(
-      dto.abstractId,
-      sessionId,
-      {
-        startTime,
-        endTime,
-      },
-    );
+
+    if (abstractId) {
+      await this.scheduleConflictService.assertNoAbstractDoubleBooking(
+        abstractId,
+        sessionId,
+        { startTime, endTime },
+      );
+    }
 
     try {
       return await this.prisma.presentationAssignment.create({
         data: {
           sessionId,
-          abstractId: dto.abstractId,
+          abstractId,
+          title: title ?? abstractTitle,
+          speakerId: dto.speakerId || null,
+          speakerName,
+          speakerAffiliation,
           presentationType: dto.presentationType,
           startTime,
           endTime,
           sortOrder: dto.sortOrder ?? 0,
+        },
+        include: {
+          abstract: true,
+          speaker: true,
         },
       });
     } catch (error) {
@@ -73,6 +133,7 @@ export class PresentationsService {
           'This abstract is already scheduled into this session.',
         );
       }
+
       throw error;
     }
   }
@@ -81,13 +142,18 @@ export class PresentationsService {
     const session = await this.prisma.programSession.findFirst({
       where: { id: sessionId, conference: { organizationId } },
     });
+
     if (!session) {
       throw new NotFoundException('Session not found.');
     }
+
     return this.prisma.presentationAssignment.findMany({
       where: { sessionId },
-      include: { abstract: true },
-      orderBy: { sortOrder: 'asc' },
+      include: {
+        abstract: true,
+        speaker: true,
+      },
+      orderBy: [{ startTime: 'asc' }, { sortOrder: 'asc' }],
     });
   }
 
@@ -101,35 +167,71 @@ export class PresentationsService {
       presentationId,
     );
 
+    if (dto.speakerId !== undefined) {
+      await this.validateSpeaker(
+        dto.speakerId,
+        presentation.session.conferenceId,
+      );
+    }
+
     const startTime = dto.startTime
       ? new Date(dto.startTime)
       : presentation.startTime;
-    const endTime = dto.endTime ? new Date(dto.endTime) : presentation.endTime;
+
+    const endTime = dto.endTime
+      ? new Date(dto.endTime)
+      : presentation.endTime;
+
     this.scheduleConflictService.assertPresentationWithinSession(
       presentation.session,
       { startTime, endTime },
     );
-    await this.scheduleConflictService.assertNoAbstractDoubleBooking(
-      presentation.abstractId,
-      presentation.sessionId,
-      { startTime, endTime },
-    );
+
+    if (presentation.abstractId) {
+      await this.scheduleConflictService.assertNoAbstractDoubleBooking(
+        presentation.abstractId,
+        presentation.sessionId,
+        { startTime, endTime },
+      );
+    }
 
     return this.prisma.presentationAssignment.update({
       where: { id: presentationId },
       data: {
+        ...(dto.title !== undefined && {
+          title: dto.title.trim() || null,
+        }),
+        ...(dto.speakerName !== undefined && {
+          speakerName: dto.speakerName.trim() || null,
+        }),
+        ...(dto.speakerAffiliation !== undefined && {
+          speakerAffiliation: dto.speakerAffiliation.trim() || null,
+        }),
+        ...(dto.speakerId !== undefined && {
+          speakerId: dto.speakerId || null,
+        }),
         ...(dto.presentationType !== undefined && {
           presentationType: dto.presentationType,
         }),
-        ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
+        ...(dto.sortOrder !== undefined && {
+          sortOrder: dto.sortOrder,
+        }),
         startTime,
         endTime,
+      },
+      include: {
+        abstract: true,
+        speaker: true,
       },
     });
   }
 
   async remove(organizationId: string, presentationId: string) {
-    await this.assertPresentationInOrganization(organizationId, presentationId);
+    await this.assertPresentationInOrganization(
+      organizationId,
+      presentationId,
+    );
+
     await this.prisma.presentationAssignment.delete({
       where: { id: presentationId },
     });
@@ -146,9 +248,11 @@ export class PresentationsService {
       },
       include: { session: true },
     });
+
     if (!presentation) {
       throw new NotFoundException('Presentation not found.');
     }
+
     return presentation;
   }
 }

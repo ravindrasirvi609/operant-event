@@ -161,16 +161,35 @@ export function DynamicFormField({ field, value, onChange, error, uploadFile }: 
         );
       }
       case 'FILE':
-        return (
-          <input
-            id={inputId}
-            type="file"
-            className="text-sm"
-            onChange={handleFileChange}
-            disabled={uploading}
-            aria-describedby={error ? errorId : undefined}
-          />
-        );
+  return (
+    <div className="space-y-2">
+      <input
+        id={inputId}
+        type="file"
+        accept=".pdf,application/pdf"
+        className="sr-only"
+        onChange={handleFileChange}
+        disabled={uploading}
+        aria-describedby={error ? errorId : undefined}
+      />
+
+      <label
+        htmlFor={inputId}
+className="inline-flex cursor-pointer items-center rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"      >
+        {uploading ? 'Uploading PDF...' : 'Upload PDF'}
+      </label>
+
+      {value ? (
+        <p className="text-sm text-green-600">
+          PDF uploaded successfully.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Upload your abstract as a PDF file.
+        </p>
+      )}
+    </div>
+  );
       default:
         return null;
     }

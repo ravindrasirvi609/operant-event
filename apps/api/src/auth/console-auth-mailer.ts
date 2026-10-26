@@ -1,7 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { AuthMailer, AuthMailerRecipient } from './auth-mailer.interface';
 
-/** Dev-only stopgap: logs instead of sending. Replace with a real provider in Phase 6. */
+import { Injectable, Logger } from '@nestjs/common';
+import type {
+  AuthMailer,
+  AuthMailerRecipient,
+  AuthInvitationDetails,
+} from './auth-mailer.interface';
+
 @Injectable()
 export class ConsoleAuthMailer implements AuthMailer {
   private readonly logger = new Logger(ConsoleAuthMailer.name);
@@ -22,6 +26,19 @@ export class ConsoleAuthMailer implements AuthMailer {
   ): Promise<void> {
     this.logger.warn(
       `[dev-only] Password reset for ${recipient.email}: token=${rawToken}`,
+    );
+    return Promise.resolve();
+  }
+
+  sendOrganizationInvitation(
+    recipient: AuthMailerRecipient,
+    rawToken: string,
+    details: AuthInvitationDetails,
+  ): Promise<void> {
+    this.logger.warn(
+      `[dev-only] Organization invitation for ${recipient.email}; ` +
+        `organization=${details.organizationName}; role=${details.roleName}; ` +
+        `token=${rawToken}`,
     );
     return Promise.resolve();
   }

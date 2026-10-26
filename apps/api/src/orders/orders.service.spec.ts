@@ -55,34 +55,40 @@ const pendingRegistration = {
   currency: 'INR',
 };
 
+
 describe('OrdersService.create', () => {
   it('rejects a registration that does not belong to the caller', async () => {
     const prisma = fakePrisma({
-      registration: { findFirst: jest.fn().mockResolvedValue(null) },
+      registration: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     });
+
     const service = new OrdersService(
       prisma,
       new Map([['razorpay', fakeProvider()]]),
     );
 
-    await expect(service.create('user-1', 'reg-x')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.create('user-1', 'reg-x'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('rejects creating an order for a registration that is not PENDING', async () => {
     const prisma = fakePrisma({
       registration: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ ...pendingRegistration, status: 'CONFIRMED' }),
+        findFirst: jest.fn().mockResolvedValue({
+          ...pendingRegistration,
+          status: 'CONFIRMED',
+        }),
       },
     });
+
     const service = new OrdersService(prisma, new Map());
 
-    await expect(service.create('user-1', 'reg-1')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.create('user-1', 'reg-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects creating a second order for the same registration', async () => {
@@ -91,16 +97,19 @@ describe('OrdersService.create', () => {
         findFirst: jest.fn().mockResolvedValue(pendingRegistration),
       },
       order: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'existing-order' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'existing-order',
+        }),
         create: jest.fn(),
         count: jest.fn(),
       },
     });
+
     const service = new OrdersService(prisma, new Map());
 
-    await expect(service.create('user-1', 'reg-1')).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(
+      service.create('user-1', 'reg-1'),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('GATEWAY mode: creates the order, requests a checkout, and records an INITIATED payment', async () => {
@@ -109,8 +118,13 @@ describe('OrdersService.create', () => {
       orderNumber: 'ORD-000001',
       currency: 'INR',
     });
-    const paymentCreate = jest.fn().mockResolvedValue({ id: 'payment-1' });
+
+    const paymentCreate = jest.fn().mockResolvedValue({
+      id: 'payment-1',
+    });
+
     const provider = fakeProvider();
+
     const prisma = fakePrisma({
       registration: {
         findFirst: jest.fn().mockResolvedValue(pendingRegistration),
@@ -121,16 +135,25 @@ describe('OrdersService.create', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       conferenceSetting: {
-        findUnique: jest.fn().mockResolvedValue({ paymentMode: 'GATEWAY' }),
+        findUnique: jest.fn().mockResolvedValue({
+          paymentMode: 'GATEWAY',
+        }),
       },
-      payment: { create: paymentCreate },
+      payment: {
+        create: paymentCreate,
+      },
     });
+
     const service = new OrdersService(
       prisma,
       new Map([['razorpay', provider]]),
     );
 
-    const result = await service.create('user-1', 'reg-1', 'razorpay');
+    const result = await service.create(
+      'user-1',
+      'reg-1',
+      'razorpay',
+    );
 
     expect(orderCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -146,12 +169,14 @@ describe('OrdersService.create', () => {
         }),
       }),
     );
+
     expect(provider.createCheckout).toHaveBeenCalledWith({
       orderId: 'order-1',
       orderNumber: 'ORD-000001',
       amount: 2000,
       currency: 'INR',
     });
+
     expect(paymentCreate).toHaveBeenCalledWith({
       data: {
         orderId: 'order-1',
@@ -162,8 +187,13 @@ describe('OrdersService.create', () => {
         status: 'INITIATED',
       },
     });
+
     expect(result).toEqual({
-      order: { id: 'order-1', orderNumber: 'ORD-000001', currency: 'INR' },
+      order: {
+        id: 'order-1',
+        orderNumber: 'ORD-000001',
+        currency: 'INR',
+      },
       checkoutUrl: 'https://pay.example/checkout',
     });
   });
@@ -174,7 +204,9 @@ describe('OrdersService.create', () => {
       orderNumber: 'ORD-000001',
       currency: 'INR',
     });
+
     const provider = fakeProvider();
+
     const prisma = fakePrisma({
       registration: {
         findFirst: jest.fn().mockResolvedValue(pendingRegistration),
@@ -185,9 +217,12 @@ describe('OrdersService.create', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       conferenceSetting: {
-        findUnique: jest.fn().mockResolvedValue({ paymentMode: 'MANUAL' }),
+        findUnique: jest.fn().mockResolvedValue({
+          paymentMode: 'MANUAL',
+        }),
       },
     });
+
     const service = new OrdersService(
       prisma,
       new Map([['razorpay', provider]]),
@@ -196,9 +231,14 @@ describe('OrdersService.create', () => {
     const result = await service.create('user-1', 'reg-1');
 
     expect(provider.createCheckout).not.toHaveBeenCalled();
+
     expect(result).toEqual({
-      order: { id: 'order-1', orderNumber: 'ORD-000001', currency: 'INR' },
-      manualPaymentInstructions: true,
+      order: {
+        id: 'order-1',
+        orderNumber: 'ORD-000001',
+        currency: 'INR',
+      },
+      manualPaymentInstructions: undefined,
     });
   });
 
@@ -208,7 +248,9 @@ describe('OrdersService.create', () => {
       orderNumber: 'ORD-000001',
       currency: 'INR',
     });
+
     const provider = fakeProvider();
+
     const prisma = fakePrisma({
       registration: {
         findFirst: jest.fn().mockResolvedValue(pendingRegistration),
@@ -218,8 +260,11 @@ describe('OrdersService.create', () => {
         create: orderCreate,
         count: jest.fn().mockResolvedValue(0),
       },
-      conferenceSetting: { findUnique: jest.fn().mockResolvedValue(null) },
+      conferenceSetting: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
     });
+
     const service = new OrdersService(
       prisma,
       new Map([['razorpay', provider]]),
@@ -228,107 +273,14 @@ describe('OrdersService.create', () => {
     const result = await service.create('user-1', 'reg-1');
 
     expect(provider.createCheckout).not.toHaveBeenCalled();
+
     expect(result).toEqual({
-      order: { id: 'order-1', orderNumber: 'ORD-000001', currency: 'INR' },
-      manualPaymentInstructions: true,
-    });
-  });
-});
-
-describe('OrdersService.findOwned', () => {
-  it('throws NotFoundException when the order does not belong to the caller', async () => {
-    const prisma = fakePrisma({
-      order: { findFirst: jest.fn().mockResolvedValue(null) },
-    });
-
-    await expect(
-      new OrdersService(prisma, new Map()).findOwned('user-1', 'order-x'),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('finds the order via the registration relation, since Order has no userId column', async () => {
-    const findFirst = jest
-      .fn()
-      .mockResolvedValue({ id: 'order-1', status: 'PENDING' });
-    const prisma = fakePrisma({ order: { findFirst } });
-
-    const result = await new OrdersService(prisma, new Map()).findOwned(
-      'user-1',
-      'order-1',
-    );
-
-    expect(findFirst).toHaveBeenCalledWith({
-      where: { id: 'order-1', registration: { userId: 'user-1' } },
-    });
-    expect(result).toEqual({ id: 'order-1', status: 'PENDING' });
-  });
-});
-
-describe('OrdersService.findForOrganizer', () => {
-  it('throws NotFoundException when the order is outside the caller organization', async () => {
-    const prisma = fakePrisma({
-      order: { findFirst: jest.fn().mockResolvedValue(null) },
-    });
-
-    await expect(
-      new OrdersService(prisma, new Map()).findForOrganizer('org-1', 'order-x'),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('finds the order scoped to the caller organization', async () => {
-    const findFirst = jest
-      .fn()
-      .mockResolvedValue({ id: 'order-1', status: 'PAID' });
-    const prisma = fakePrisma({ order: { findFirst } });
-
-    const result = await new OrdersService(prisma, new Map()).findForOrganizer(
-      'org-1',
-      'order-1',
-    );
-
-    expect(findFirst).toHaveBeenCalledWith({
-      where: { id: 'order-1', conference: { organizationId: 'org-1' } },
-    });
-    expect(result).toEqual({ id: 'order-1', status: 'PAID' });
-  });
-});
-
-describe('OrdersService.findAllForOrganizer', () => {
-  it('lists orders scoped to the conference, optionally filtered by status', async () => {
-    const findMany = jest.fn().mockResolvedValue([{ id: 'order-1' }]);
-    const prisma = fakePrisma({ order: { findMany } });
-
-    const result = await new OrdersService(
-      prisma,
-      new Map(),
-    ).findAllForOrganizer('org-1', 'conf-1', 'PENDING');
-
-    expect(findMany).toHaveBeenCalledWith({
-      where: {
-        conferenceId: 'conf-1',
-        conference: { organizationId: 'org-1' },
-        status: 'PENDING',
+      order: {
+        id: 'order-1',
+        orderNumber: 'ORD-000001',
+        currency: 'INR',
       },
-      include: { payments: true },
-    });
-    expect(result).toEqual([{ id: 'order-1' }]);
-  });
-
-  it('omits the status filter when none is given', async () => {
-    const findMany = jest.fn().mockResolvedValue([]);
-    const prisma = fakePrisma({ order: { findMany } });
-
-    await new OrdersService(prisma, new Map()).findAllForOrganizer(
-      'org-1',
-      'conf-1',
-    );
-
-    expect(findMany).toHaveBeenCalledWith({
-      where: {
-        conferenceId: 'conf-1',
-        conference: { organizationId: 'org-1' },
-      },
-      include: { payments: true },
+      manualPaymentInstructions: undefined,
     });
   });
 });

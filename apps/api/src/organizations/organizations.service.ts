@@ -127,11 +127,15 @@ export class OrganizationsService {
     // Send invite after the transaction commits so a mailer failure doesn't
     // roll back the already-created org.
     if (newOwnerCreated && inviteToken) {
-      await this.mailer.sendPasswordReset(
-        { email: dto.ownerEmail, firstName: dto.ownerFirstName },
-        inviteToken,
-      );
-    }
+  await this.mailer.sendOrganizationInvitation(
+    { email: dto.ownerEmail, firstName: dto.ownerFirstName },
+    inviteToken,
+    {
+      organizationName: organization.name,
+      roleName: OWNER_ROLE_NAME,
+    },
+  );
+}
 
     return organization;
   }
@@ -193,7 +197,9 @@ export class OrganizationsService {
    * for what is functionally identical flow.
    */
   async inviteMember(organizationId: string, dto: InviteMemberDto) {
+    let invitationToken: string | undefined;
     let user = await this.prisma.user.findUnique({
+
       where: { email: dto.email },
     });
 
@@ -208,6 +214,7 @@ export class OrganizationsService {
         },
       });
 
+
       const { token, tokenHash } = this.tokenService.issueRefreshToken();
       await this.prisma.passwordResetToken.create({
         data: {
@@ -216,20 +223,58 @@ export class OrganizationsService {
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
         },
       });
-      await this.mailer.sendPasswordReset(
-        { email: user.email, firstName: user.firstName },
-        token,
-      );
+      invitationToken = token;
     }
 
-    return this.prisma.organizationMembership.create({
-      data: {
+
+const existingMembership =
+  await this.prisma.organizationMembership.findUnique({
+    where: {
+      organizationId_userId: {
         organizationId,
         userId: user.id,
-        status: 'INVITED',
-        roles: { create: dto.roleIds.map((roleId) => ({ roleId })) },
       },
-    });
+    },
+  });
+
+if (existingMembership) {
+  throw new ConflictException(
+    'This user is already a member or has a pending invitation for this organization.',
+  );
+}
+
+
+    const membership = await this.prisma.organizationMembership.create({
+  data: {
+    organizationId,
+    userId: user.id,
+    status: 'INVITED',
+    roles: { create: dto.roleIds.map((roleId) => ({ roleId })) },
+  },
+});
+
+if (invitationToken) {
+  const organization = await this.prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true },
+  });
+
+  const roles = await this.prisma.role.findMany({
+    where: { id: { in: dto.roleIds } },
+    select: { name: true },
+  });
+
+  await this.mailer.sendOrganizationInvitation(
+    { email: user.email, firstName: user.firstName },
+    invitationToken,
+    {
+      organizationName: organization?.name ?? 'your organization',
+      roleName: roles.map((role) => role.name).join(', '),
+    },
+  );
+}
+
+return membership;
   }
 
   async updateMembershipStatus(

@@ -7,7 +7,13 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { listTimezones } from '@/lib/conferences/timezones';
 import type { Conference } from '@/lib/conferences/types';
 
@@ -24,8 +30,12 @@ const conferenceSchema = z.object({
   venueAddress: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
-  website: z.union([z.literal(''), z.string().url('Enter a valid URL.')]).optional(),
-  contactEmail: z.union([z.literal(''), z.string().email('Enter a valid email address.')]).optional(),
+  website: z
+    .union([z.literal(''), z.string().url('Enter a valid URL.')])
+    .optional(),
+  contactEmail: z
+    .union([z.literal(''), z.string().email('Enter a valid email address.')])
+    .optional(),
 });
 
 export type ConferenceFormValues = z.infer<typeof conferenceSchema>;
@@ -36,13 +46,38 @@ interface ConferenceFormProps {
   submitLabel: string;
 }
 
-export function ConferenceForm({ defaultValues, onSubmit, submitLabel }: ConferenceFormProps) {
+export function ConferenceForm({
+  defaultValues,
+  onSubmit,
+  submitLabel,
+}: ConferenceFormProps) {
   const timezones = useMemo(() => listTimezones(), []);
   const [timezoneFilter, setTimezoneFilter] = useState('');
-  const filteredTimezones = useMemo(
-    () => timezones.filter((tz) => tz.toLowerCase().includes(timezoneFilter.toLowerCase())),
-    [timezones, timezoneFilter],
+
+  const filteredTimezones = useMemo(() => {
+    const query = timezoneFilter.trim().toLowerCase();
+
+    if (!query) {
+      return timezones;
+    }
+
+    return timezones.filter((tz) =>
+      tz.toLowerCase().includes(query),
+    );
+  }, [timezones, timezoneFilter]);
+
+  const safeDefaultValues = useMemo(
+    () => ({
+      timezone: 'UTC',
+      ...defaultValues,
+      website:
+        defaultValues?.website === 'https://'
+          ? ''
+          : defaultValues?.website ?? '',
+    }),
+    [defaultValues],
   );
+
   const {
     register,
     handleSubmit,
@@ -51,73 +86,208 @@ export function ConferenceForm({ defaultValues, onSubmit, submitLabel }: Confere
     formState: { errors, isSubmitting },
   } = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
-    defaultValues: { timezone: 'UTC', ...defaultValues },
+    defaultValues: safeDefaultValues,
   });
+
   const timezone = watch('timezone');
 
+  async function handleFormSubmit(values: ConferenceFormValues) {
+    const cleanedValues: ConferenceFormValues = {
+      ...values,
+
+      name: values.name.trim(),
+      shortName: values.shortName?.trim() ?? '',
+      description: values.description?.trim() ?? '',
+      venueName: values.venueName?.trim() ?? '',
+      venueAddress: values.venueAddress?.trim() ?? '',
+      city: values.city?.trim() ?? '',
+      country: values.country?.trim() ?? '',
+
+      // Empty website must NOT be sent as "https://".
+      website:
+        values.website?.trim() && values.website.trim() !== 'https://'
+          ? values.website.trim()
+          : '',
+
+      contactEmail: values.contactEmail?.trim() ?? '',
+    };
+
+    await onSubmit(cleanedValues);
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-xl space-y-4" noValidate>
-      <FormField label="Conference name" htmlFor="conf-name" error={errors.name?.message}>
+    <form
+      onSubmit={handleSubmit(handleFormSubmit)}
+      className="w-full max-w-6xl space-y-6"      noValidate
+    >
+      <FormField
+        label="Conference name"
+        htmlFor="conf-name"
+        error={errors.name?.message}
+      >
         <Input id="conf-name" {...register('name')} />
       </FormField>
-      <FormField label="Short name (optional)" htmlFor="conf-short-name" error={errors.shortName?.message}>
+
+      <FormField
+        label="Short name (optional)"
+        htmlFor="conf-short-name"
+        error={errors.shortName?.message}
+      >
         <Input id="conf-short-name" {...register('shortName')} />
       </FormField>
+
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Start date" htmlFor="conf-start-date" error={errors.startDate?.message}>
-          <Input id="conf-start-date" type="date" {...register('startDate')} />
+        <FormField
+          label="Start date"
+          htmlFor="conf-start-date"
+          error={errors.startDate?.message}
+        >
+          <Input
+            id="conf-start-date"
+            type="date"
+            {...register('startDate')}
+          />
         </FormField>
-        <FormField label="End date" htmlFor="conf-end-date" error={errors.endDate?.message}>
-          <Input id="conf-end-date" type="date" {...register('endDate')} />
+
+        <FormField
+          label="End date"
+          htmlFor="conf-end-date"
+          error={errors.endDate?.message}
+        >
+          <Input
+            id="conf-end-date"
+            type="date"
+            {...register('endDate')}
+          />
         </FormField>
       </div>
-      <FormField label="Timezone" htmlFor="conf-timezone" error={errors.timezone?.message}>
-        <Select value={timezone} onValueChange={(value) => value && setValue('timezone', value, { shouldValidate: true })}>
+
+      <FormField
+        label="Timezone"
+        htmlFor="conf-timezone"
+        error={errors.timezone?.message}
+      >
+        <Select
+          value={timezone}
+          onValueChange={(value) =>
+            value &&
+            setValue('timezone', value, {
+              shouldValidate: true,
+            })
+          }
+        >
           <SelectTrigger id="conf-timezone" className="w-full">
             <SelectValue placeholder="Select a timezone" />
           </SelectTrigger>
+
           <SelectContent>
             <div className="p-1">
               <Input
                 placeholder="Search timezones…"
                 value={timezoneFilter}
-                onChange={(event) => setTimezoneFilter(event.target.value)}
+                onChange={(event) =>
+                  setTimezoneFilter(event.target.value)
+                }
                 onKeyDown={(event) => event.stopPropagation()}
               />
             </div>
-            {filteredTimezones.slice(0, 100).map((tz) => (
-              <SelectItem key={tz} value={tz}>
-                {tz}
-              </SelectItem>
-            ))}
+
+            {filteredTimezones.length > 0 ? (
+              filteredTimezones.map((tz) => (
+                <SelectItem key={tz} value={tz}>
+                  {tz}
+                </SelectItem>
+              ))
+            ) : (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                No timezones found.
+              </div>
+            )}
           </SelectContent>
         </Select>
       </FormField>
-      <FormField label="Description (optional)" htmlFor="conf-description" error={errors.description?.message}>
-        <Input id="conf-description" {...register('description')} />
+
+      <FormField
+        label="Description (optional)"
+        htmlFor="conf-description"
+        error={errors.description?.message}
+      >
+        <Input
+          id="conf-description"
+          {...register('description')}
+        />
       </FormField>
+
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Venue name (optional)" htmlFor="conf-venue-name" error={errors.venueName?.message}>
-          <Input id="conf-venue-name" {...register('venueName')} />
+        <FormField
+          label="Venue name (optional)"
+          htmlFor="conf-venue-name"
+          error={errors.venueName?.message}
+        >
+          <Input
+            id="conf-venue-name"
+            {...register('venueName')}
+          />
         </FormField>
-        <FormField label="Venue address (optional)" htmlFor="conf-venue-address" error={errors.venueAddress?.message}>
-          <Input id="conf-venue-address" {...register('venueAddress')} />
+
+        <FormField
+          label="Venue address (optional)"
+          htmlFor="conf-venue-address"
+          error={errors.venueAddress?.message}
+        >
+          <Input
+            id="conf-venue-address"
+            {...register('venueAddress')}
+          />
         </FormField>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="City (optional)" htmlFor="conf-city" error={errors.city?.message}>
+        <FormField
+          label="City (optional)"
+          htmlFor="conf-city"
+          error={errors.city?.message}
+        >
           <Input id="conf-city" {...register('city')} />
         </FormField>
-        <FormField label="Country (optional)" htmlFor="conf-country" error={errors.country?.message}>
-          <Input id="conf-country" {...register('country')} />
+
+        <FormField
+          label="Country (optional)"
+          htmlFor="conf-country"
+          error={errors.country?.message}
+        >
+          <Input
+            id="conf-country"
+            {...register('country')}
+          />
         </FormField>
       </div>
-      <FormField label="Website (optional)" htmlFor="conf-website" error={errors.website?.message}>
-        <Input id="conf-website" type="url" placeholder="https://" {...register('website')} />
+
+      <FormField
+        label="Website (optional)"
+        htmlFor="conf-website"
+        error={errors.website?.message}
+      >
+        <Input
+          id="conf-website"
+          type="url"
+          placeholder="https://example.com"
+          {...register('website')}
+        />
       </FormField>
-      <FormField label="Contact email (optional)" htmlFor="conf-contact-email" error={errors.contactEmail?.message}>
-        <Input id="conf-contact-email" type="email" {...register('contactEmail')} />
+
+      <FormField
+        label="Contact email (optional)"
+        htmlFor="conf-contact-email"
+        error={errors.contactEmail?.message}
+      >
+        <Input
+          id="conf-contact-email"
+          type="email"
+          {...register('contactEmail')}
+        />
       </FormField>
+
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Saving…' : submitLabel}
       </Button>
@@ -125,7 +295,9 @@ export function ConferenceForm({ defaultValues, onSubmit, submitLabel }: Confere
   );
 }
 
-export function conferenceToFormValues(conference: Conference): ConferenceFormValues {
+export function conferenceToFormValues(
+  conference: Conference,
+): ConferenceFormValues {
   return {
     name: conference.name,
     shortName: conference.shortName ?? '',
@@ -137,7 +309,10 @@ export function conferenceToFormValues(conference: Conference): ConferenceFormVa
     venueAddress: conference.venueAddress ?? '',
     city: conference.city ?? '',
     country: conference.country ?? '',
-    website: conference.website ?? '',
+    website:
+      conference.website === 'https://'
+        ? ''
+        : conference.website ?? '',
     contactEmail: conference.contactEmail ?? '',
   };
 }

@@ -18,6 +18,7 @@ const FIELD_TYPES = [
   'CHECKBOX',
   'FILE',
   'URL',
+  'AUTHOR_BLOCK',
 ] as const;
 
 export class CreateFormFieldDto {

@@ -3,92 +3,216 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
+import { FormFieldType } from '@operant-event/database';
 import type { Prisma } from '@operant-event/database';
+
 import { PrismaService } from '../common/prisma/prisma.service';
+
 import type { CreateFormFieldDto } from './dto/create-form-field.dto';
 import type { UpdateFormFieldDto } from './dto/update-form-field.dto';
 
 @Injectable()
 export class ConferenceFormFieldsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   async create(
     organizationId: string,
     conferenceId: string,
     dto: CreateFormFieldDto,
   ) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
 
-    const existing = await this.prisma.conferenceFormField.findUnique({
-      where: {
-        conferenceId_fieldKey: { conferenceId, fieldKey: dto.fieldKey },
-      },
-    });
+    const existing =
+      await this.prisma.conferenceFormField.findUnique({
+        where: {
+          conferenceId_fieldKey: {
+            conferenceId,
+            fieldKey: dto.fieldKey,
+          },
+        },
+      });
+
     if (existing) {
       throw new ConflictException(
         `A field with key "${dto.fieldKey}" already exists on this conference.`,
       );
     }
 
-    const sortOrder = await this.prisma.conferenceFormField.count({
-      where: { conferenceId },
-    });
+    const sortOrder =
+      await this.prisma.conferenceFormField.count({
+        where: {
+          conferenceId,
+        },
+      });
+
     return this.prisma.conferenceFormField.create({
       data: {
         conferenceId,
         section: dto.section,
         fieldKey: dto.fieldKey,
         label: dto.label,
-        fieldType: dto.fieldType,
+
+        fieldType: dto.fieldType as FormFieldType,
+
         isRequired: dto.isRequired ?? false,
-        optionsJson: dto.optionsJson as Prisma.InputJsonValue | undefined,
-        validationJson: dto.validationJson as Prisma.InputJsonValue | undefined,
+
+        optionsJson:
+          dto.optionsJson !== undefined
+            ? (dto.optionsJson as Prisma.InputJsonValue)
+            : undefined,
+
+        validationJson:
+          dto.validationJson !== undefined
+            ? (dto.validationJson as Prisma.InputJsonValue)
+            : undefined,
+
         sortOrder,
       },
     });
   }
 
-  /** The set the dynamic form renderer and the submit-time validator both use. */
-  async findActive(organizationId: string, conferenceId: string) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+  /**
+   * Admin Form Builder view.
+   *
+   * Returns both ACTIVE and DISABLED fields
+   * so disabled fields can be enabled again.
+   */
+  async findAll(
+    organizationId: string,
+    conferenceId: string,
+  ) {
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
     return this.prisma.conferenceFormField.findMany({
-      where: { conferenceId, status: 'ACTIVE' },
-      orderBy: { sortOrder: 'asc' },
+      where: {
+        conferenceId,
+      },
+      orderBy: {
+        sortOrder: 'asc',
+      },
     });
   }
 
   /**
-   * No organization check: authors filling out a submission have no org
-   * context, matching AbstractsController's own author-facing routes.
+   * Organization-scoped active fields.
+   *
+   * Kept for compatibility with existing service
+   * consumers and tests.
    */
-  async findActiveForSubmission(conferenceId: string) {
+  async findActive(
+    organizationId: string,
+    conferenceId: string,
+  ) {
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
     return this.prisma.conferenceFormField.findMany({
-      where: { conferenceId, status: 'ACTIVE' },
-      orderBy: { sortOrder: 'asc' },
+      where: {
+        conferenceId,
+        status: 'ACTIVE',
+      },
+      orderBy: {
+        sortOrder: 'asc',
+      },
     });
   }
 
-  /** Disabling is a status flip, never a delete — historical AbstractVersion.formData must stay interpretable. */
+  /**
+   * Submission form view.
+   *
+   * Only ACTIVE fields are available to authors.
+   */
+  async findActiveForSubmission(
+    conferenceId: string,
+  ) {
+    return this.prisma.conferenceFormField.findMany({
+      where: {
+        conferenceId,
+        status: 'ACTIVE',
+      },
+      orderBy: {
+        sortOrder: 'asc',
+      },
+    });
+  }
+
+  /**
+   * Update an existing form field.
+   *
+   * Field key is intentionally not editable because
+   * it identifies submitted form data.
+   */
   async update(
     organizationId: string,
     conferenceId: string,
     fieldId: string,
     dto: UpdateFormFieldDto,
   ) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
+    const existing =
+      await this.prisma.conferenceFormField.findFirst({
+        where: {
+          id: fieldId,
+          conferenceId,
+        },
+      });
+
+    if (!existing) {
+      throw new NotFoundException(
+        'Form field not found.',
+      );
+    }
+
     return this.prisma.conferenceFormField.update({
-      where: { id: fieldId, conferenceId },
+      where: {
+        id: fieldId,
+      },
+
       data: {
-        ...(dto.label !== undefined && { label: dto.label }),
-        ...(dto.isRequired !== undefined && { isRequired: dto.isRequired }),
+        ...(dto.label !== undefined && {
+          label: dto.label,
+        }),
+
+        ...(dto.fieldType !== undefined && {
+          fieldType: dto.fieldType as FormFieldType,
+        }),
+
+        ...(dto.isRequired !== undefined && {
+          isRequired: dto.isRequired,
+        }),
+
         ...(dto.optionsJson !== undefined && {
-          optionsJson: dto.optionsJson as Prisma.InputJsonValue,
+          optionsJson:
+            dto.optionsJson as Prisma.InputJsonValue,
         }),
+
         ...(dto.validationJson !== undefined && {
-          validationJson: dto.validationJson as Prisma.InputJsonValue,
+          validationJson:
+            dto.validationJson as Prisma.InputJsonValue,
         }),
-        ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
-        ...(dto.status !== undefined && { status: dto.status }),
+
+        ...(dto.sortOrder !== undefined && {
+          sortOrder: dto.sortOrder,
+        }),
+
+        ...(dto.status !== undefined && {
+          status: dto.status,
+        }),
       },
     });
   }
@@ -97,11 +221,18 @@ export class ConferenceFormFieldsService {
     organizationId: string,
     conferenceId: string,
   ): Promise<void> {
-    const conference = await this.prisma.conference.findFirst({
-      where: { id: conferenceId, organizationId },
-    });
+    const conference =
+      await this.prisma.conference.findFirst({
+        where: {
+          id: conferenceId,
+          organizationId,
+        },
+      });
+
     if (!conference) {
-      throw new NotFoundException('Conference not found.');
+      throw new NotFoundException(
+        'Conference not found.',
+      );
     }
   }
 }

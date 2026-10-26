@@ -30,3 +30,17 @@ export function useMarkNotificationRead() {
     },
   });
 }
+
+export function useClearNotifications() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiPatch<{ clearedCount: number }>('notifications/my/clear'),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: NOTIFICATIONS_QUERY_KEY,
+      });
+    },
+  });
+}

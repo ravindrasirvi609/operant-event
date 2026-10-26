@@ -1,3 +1,4 @@
+
 import { NotFoundException } from '@nestjs/common';
 import { EmailTemplatesService } from './email-templates.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
@@ -7,16 +8,23 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     emailTemplate: {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
       update: jest.fn(),
     },
+    conference: {
+      findFirst: jest.fn(),
+    },
   };
+
   const baseRecord = base as unknown as Record<
     string,
     Record<string, jest.Mock>
   >;
+
   for (const [model, methods] of Object.entries(overrides)) {
     Object.assign(baseRecord[model], methods);
   }
+
   return base as unknown as PrismaService;
 }
 
@@ -25,16 +33,13 @@ describe('EmailTemplatesService.resolve', () => {
     const findFirst = jest
       .fn()
       .mockResolvedValueOnce({ id: 'template-specific' });
+
     const prisma = fakePrisma({
-      emailTemplate: { findFirst, findMany: jest.fn(), update: jest.fn() },
+      emailTemplate: { findFirst, findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
     });
     const service = new EmailTemplatesService(prisma);
 
-    const result = await service.resolve(
-      'org-1',
-      'conf-1',
-      'abstract.accepted',
-    );
+    const result = await service.resolve('org-1', 'conf-1', 'abstract.accepted');
 
     expect(findFirst).toHaveBeenCalledWith({
       where: {
@@ -51,16 +56,13 @@ describe('EmailTemplatesService.resolve', () => {
       .fn()
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'template-default' });
+
     const prisma = fakePrisma({
-      emailTemplate: { findFirst, findMany: jest.fn(), update: jest.fn() },
+      emailTemplate: { findFirst, findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
     });
     const service = new EmailTemplatesService(prisma);
 
-    const result = await service.resolve(
-      'org-1',
-      'conf-1',
-      'abstract.accepted',
-    );
+    const result = await service.resolve('org-1', 'conf-1', 'abstract.accepted');
 
     expect(findFirst).toHaveBeenNthCalledWith(2, {
       where: {
@@ -74,8 +76,9 @@ describe('EmailTemplatesService.resolve', () => {
 
   it('goes straight to the organization-wide default when no conferenceId is given', async () => {
     const findFirst = jest.fn().mockResolvedValue({ id: 'template-default' });
+
     const prisma = fakePrisma({
-      emailTemplate: { findFirst, findMany: jest.fn(), update: jest.fn() },
+      emailTemplate: { findFirst, findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
     });
     const service = new EmailTemplatesService(prisma);
 
@@ -96,6 +99,7 @@ describe('EmailTemplatesService.resolve', () => {
       emailTemplate: {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
       },
     });
@@ -110,8 +114,9 @@ describe('EmailTemplatesService.resolve', () => {
 describe('EmailTemplatesService.findAll', () => {
   it('lists organization-wide templates when no conferenceId is given', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
+
     const prisma = fakePrisma({
-      emailTemplate: { findFirst: jest.fn(), findMany, update: jest.fn() },
+      emailTemplate: { findFirst: jest.fn(), findMany, create: jest.fn(), update: jest.fn() },
     });
     const service = new EmailTemplatesService(prisma);
 
@@ -124,8 +129,9 @@ describe('EmailTemplatesService.findAll', () => {
 
   it('includes both conference-specific and organization-wide templates when a conferenceId is given', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
+
     const prisma = fakePrisma({
-      emailTemplate: { findFirst: jest.fn(), findMany, update: jest.fn() },
+      emailTemplate: { findFirst: jest.fn(), findMany, create: jest.fn(), update: jest.fn() },
     });
     const service = new EmailTemplatesService(prisma);
 
@@ -146,6 +152,7 @@ describe('EmailTemplatesService.update', () => {
       emailTemplate: {
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
       },
     });
@@ -158,10 +165,12 @@ describe('EmailTemplatesService.update', () => {
 
   it('updates only the provided fields', async () => {
     const update = jest.fn().mockResolvedValue({ id: 'template-1' });
+
     const prisma = fakePrisma({
       emailTemplate: {
         findFirst: jest.fn().mockResolvedValue({ id: 'template-1' }),
         findMany: jest.fn(),
+        create: jest.fn(),
         update,
       },
     });
@@ -173,5 +182,84 @@ describe('EmailTemplatesService.update', () => {
       where: { id: 'template-1' },
       data: { subject: 'New subject' },
     });
+  });
+});
+
+describe('EmailTemplatesService.ensureFeedbackCertificateTemplate', () => {
+  it('creates an organization-wide default template when it does not exist', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'template-new' });
+
+    const prisma = fakePrisma({
+      emailTemplate: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn(),
+        create,
+        update: jest.fn(),
+      },
+    });
+    const service = new EmailTemplatesService(prisma);
+
+    const result = await service.ensureFeedbackCertificateTemplate('org-1');
+
+    expect(result).toEqual({
+      created: true,
+      template: { id: 'template-new' },
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: 'org-1',
+        conferenceId: null,
+        event: 'conference.feedback_submitted',
+        subject: 'Your {{conferenceName}} Certificate Is Ready',
+        body: expect.stringContaining('{{certificatesUrl}}'),
+      }),
+    });
+  });
+
+  it('does not create a duplicate template when one already exists', async () => {
+    const existing = { id: 'template-existing' };
+    const create = jest.fn();
+
+    const prisma = fakePrisma({
+      emailTemplate: {
+        findFirst: jest.fn().mockResolvedValue(existing),
+        findMany: jest.fn(),
+        create,
+        update: jest.fn(),
+      },
+    });
+    const service = new EmailTemplatesService(prisma);
+
+    const result = await service.ensureFeedbackCertificateTemplate('org-1');
+
+    expect(result).toEqual({
+      created: false,
+      template: existing,
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a conference that does not belong to the organization', async () => {
+    const create = jest.fn();
+
+    const prisma = fakePrisma({
+      conference: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      emailTemplate: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create,
+        update: jest.fn(),
+      },
+    });
+    const service = new EmailTemplatesService(prisma);
+
+    await expect(
+      service.ensureFeedbackCertificateTemplate('org-1', 'conf-other'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(create).not.toHaveBeenCalled();
   });
 });

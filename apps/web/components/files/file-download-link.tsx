@@ -1,10 +1,34 @@
+
 'use client';
 
-/** Uses the same-origin authenticated download proxy so local `file://` storage URLs never reach the browser. */
-export function FileDownloadLink({ fileId, label }: { fileId: string; label: string }) {
+type FileDownloadLinkProps =
+  | {
+      fileId: string;
+      label: string;
+      certificateId?: never;
+    }
+  | {
+      certificateId: string;
+      label: string;
+      fileId?: never;
+    };
+
+export function FileDownloadLink(props: FileDownloadLinkProps) {
+  const href =
+    'certificateId' in props && props.certificateId
+      ? `/api/proxy/certificates/${encodeURIComponent(
+          props.certificateId,
+        )}/download`
+      : `/api/proxy/files/${encodeURIComponent(
+          props.fileId!,
+        )}/download`;
+
   return (
-    <a href={`/api/proxy/files/${fileId}/download`} className="text-xs text-primary underline">
-      {label}
+    <a
+      href={href}
+      className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium text-primary hover:bg-accent"
+    >
+      {props.label}
     </a>
   );
 }

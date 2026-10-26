@@ -6,12 +6,13 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     conference: { findFirst: jest.fn() },
     conferenceFormField: {
-      count: jest.fn(),
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
+  count: jest.fn(),
+  create: jest.fn(),
+  findFirst: jest.fn(),
+  findMany: jest.fn(),
+  findUnique: jest.fn(),
+  update: jest.fn(),
+},
   };
   const baseRecord = base as unknown as Record<
     string,
@@ -136,9 +137,16 @@ describe('ConferenceFormFieldsService.update', () => {
       .fn()
       .mockResolvedValue({ id: 'field-1', status: 'DISABLED' });
     const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(inOrg) },
-      conferenceFormField: { update },
-    });
+  conference: { findFirst: jest.fn().mockResolvedValue(inOrg) },
+  conferenceFormField: {
+    findFirst: jest.fn().mockResolvedValue({
+      id: 'field-1',
+      conferenceId: 'conf-1',
+      status: 'ACTIVE',
+    }),
+    update,
+  },
+});
 
     await new ConferenceFormFieldsService(prisma).update(
       'org-1',
@@ -150,8 +158,8 @@ describe('ConferenceFormFieldsService.update', () => {
     );
 
     expect(update).toHaveBeenCalledWith({
-      where: { id: 'field-1', conferenceId: 'conf-1' },
-      data: { status: 'DISABLED' },
-    });
+  where: { id: 'field-1' },
+  data: { status: 'DISABLED' },
+});
   });
 });

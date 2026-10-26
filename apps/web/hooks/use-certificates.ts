@@ -1,47 +1,138 @@
+
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+
 import { apiGet, apiPost } from '@/lib/api/client';
-import type { Certificate, CertificateVerification, CertificateWithRegistration } from '@/lib/certificates/types';
+
+import type {
+  Certificate,
+  CertificateVerification,
+  CertificateWithRegistration,
+  MyCertificate,
+} from '@/lib/certificates/types';
 
 function certificatesInvalidationKey(conferenceId: string) {
   return ['conferences', conferenceId, 'certificates'];
 }
 
-/** Runs the full eligibility sweep synchronously and returns only the newly-created ELIGIBLE rows (not every certificate for the conference). */
+export interface ConferenceFeedback {
+  id: string;
+  conferenceId: string;
+  userId: string;
+  rating: number;
+  contentRating: string;
+  comments: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitConferenceFeedbackInput {
+  rating: number;
+  contentRating: 'Excellent' | 'Good' | 'Average' | 'Needs improvement';
+  comments?: string;
+}
+
+export function useMyCertificates() {
+  return useQuery({
+    queryKey: ['certificates', 'mine'],
+    queryFn: () => apiGet<MyCertificate[]>('certificates/mine'),
+  });
+}
+
+export function useMyConferenceFeedback(conferenceId: string) {
+  return useQuery({
+    queryKey: ['conference-feedback', 'mine', conferenceId],
+    queryFn: () =>
+      apiGet<ConferenceFeedback | null>(
+        `conferences/${conferenceId}/feedback/mine`,
+      ),
+    enabled: Boolean(conferenceId),
+  });
+}
+
+export function useSubmitConferenceFeedback(conferenceId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SubmitConferenceFeedbackInput) =>
+      apiPost<ConferenceFeedback>(
+        `conferences/${conferenceId}/feedback`,
+        input,
+      ),
+
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['conference-feedback', 'mine', conferenceId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['certificates', 'mine'],
+        }),
+      ]);
+    },
+  });
+}
+
+export function useConferenceCertificates(conferenceId: string) {
+  return useQuery({
+    queryKey: certificatesInvalidationKey(conferenceId),
+    queryFn: () =>
+      apiGet<CertificateWithRegistration[]>(
+        `conferences/${conferenceId}/certificates`,
+      ),
+    enabled: Boolean(conferenceId),
+  });
+}
+
 export function useGenerateCertificates(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: () => apiPost<Certificate[]>(`conferences/${conferenceId}/certificates/generate`),
+    mutationFn: () =>
+      apiPost<Certificate[]>(
+        `conferences/${conferenceId}/certificates/generate`,
+      ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: certificatesInvalidationKey(conferenceId) });
+      void queryClient.invalidateQueries({
+        queryKey: certificatesInvalidationKey(conferenceId),
+      });
     },
   });
 }
 
-/** Transitions ELIGIBLE straight to ISSUED (GENERATED is never produced), rendering and attaching a real PDF (`fileId`) in the same call. */
 export function useIssueCertificate(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (certificateId: string) => apiPost<Certificate>(`certificates/${certificateId}/issue`),
+    mutationFn: (certificateId: string) =>
+      apiPost<Certificate>(`certificates/${certificateId}/issue`),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: certificatesInvalidationKey(conferenceId) });
+      void queryClient.invalidateQueries({
+        queryKey: certificatesInvalidationKey(conferenceId),
+      });
     },
   });
 }
 
-/** Only valid from ISSUED — the backend 400s otherwise. There is no un-revoke endpoint. */
 export function useRevokeCertificate(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: (certificateId: string) => apiPost<Certificate>(`certificates/${certificateId}/revoke`),
+    mutationFn: (certificateId: string) =>
+      apiPost<Certificate>(`certificates/${certificateId}/revoke`),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: certificatesInvalidationKey(conferenceId) });
+      void queryClient.invalidateQueries({
+        queryKey: certificatesInvalidationKey(conferenceId),
+      });
     },
   });
 }
 
-/** Owner-facing: bare Certificate row, no `registration`/`conference` include, scoped by `registration.userId === caller.id`. */
 export function useCertificate(certificateId: string) {
   return useQuery({
     queryKey: ['certificates', certificateId],
@@ -53,20 +144,19 @@ export function useCertificate(certificateId: string) {
 export function useOrganizerCertificate(certificateId: string) {
   return useQuery({
     queryKey: ['certificates', certificateId, 'organizer'],
-    queryFn: () => apiGet<CertificateWithRegistration>(`certificates/${certificateId}/organizer`),
+    queryFn: () =>
+      apiGet<CertificateWithRegistration>(
+        `certificates/${certificateId}/organizer`,
+      ),
     enabled: Boolean(certificateId),
   });
 }
 
-/**
- * Public, no auth — this exact 6-field shape is the entire response.
- * 404s identically for "wrong code," "not yet issued," and "revoked" —
- * there is no way to distinguish those cases from this endpoint alone.
- */
 export function useVerifyCertificate(code: string) {
   return useQuery({
     queryKey: ['certificates', 'verify', code],
-    queryFn: () => apiGet<CertificateVerification>(`certificates/verify/${code}`),
+    queryFn: () =>
+      apiGet<CertificateVerification>(`certificates/verify/${code}`),
     enabled: Boolean(code),
     retry: false,
   });

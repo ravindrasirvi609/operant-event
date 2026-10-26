@@ -1,3 +1,4 @@
+
 import {
   IsDateString,
   IsInt,
@@ -7,6 +8,22 @@ import {
 } from 'class-validator';
 
 export class UpdatePresentationDto {
+  @IsOptional()
+  @IsString()
+  speakerId?: string | null;
+
+    @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  speakerName?: string;
+
+  @IsOptional()
+  @IsString()
+  speakerAffiliation?: string;
+
   @IsOptional()
   @IsString()
   presentationType?: string;

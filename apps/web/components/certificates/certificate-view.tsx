@@ -15,11 +15,20 @@ export function CertificateView({ certificate }: { certificate: Certificate }) {
         <dt className="text-muted-foreground">Issued</dt>
         <dd>{certificate.issuedAt ? new Date(certificate.issuedAt).toLocaleDateString() : 'Not yet issued'}</dd>
       </dl>
-      {certificate.fileId ? (
-        <FileDownloadLink fileId={certificate.fileId} label="Download certificate PDF" />
-      ) : (
-        <p className="text-xs text-muted-foreground">Certificate issued, document pending.</p>
-      )}
+      {certificate.status === 'ISSUED' && certificate.fileId ? (
+  <FileDownloadLink
+    certificateId={certificate.id}
+    label="Download certificate PDF"
+  />
+) : certificate.status === 'REVOKED' ? (
+  <p className="text-xs text-destructive">
+    This certificate has been revoked.
+  </p>
+) : (
+  <p className="text-xs text-muted-foreground">
+    Certificate is not available for download yet.
+  </p>
+)}
     </div>
   );
 }

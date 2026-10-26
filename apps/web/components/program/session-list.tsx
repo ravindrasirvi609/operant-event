@@ -48,6 +48,7 @@ export function SessionList({ conferenceId }: { conferenceId: string }) {
 
       {creating ? (
         <SessionForm
+        conferenceId={conferenceId}
           submitLabel="Create session"
           onSubmit={async (values: SessionFormValues) => {
             await createSession.mutateAsync(values);

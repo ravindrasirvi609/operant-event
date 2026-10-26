@@ -9,8 +9,11 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
   };
+
+
   const baseRecord = base as unknown as Record<
     string,
     Record<string, jest.Mock>
@@ -95,6 +98,8 @@ describe('NotificationsService.notify', () => {
   });
 });
 
+
+
 describe('NotificationsService.findMine', () => {
   it('lists the caller notifications, most recent first', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
@@ -110,10 +115,13 @@ describe('NotificationsService.findMine', () => {
 
     await service.findMine('user-1');
 
-    expect(findMany).toHaveBeenCalledWith({
-      where: { userId: 'user-1' },
-      orderBy: { createdAt: 'desc' },
-    });
+   expect(findMany).toHaveBeenCalledWith({
+  where: {
+    userId: 'user-1',
+    clearedAt: null,
+  },
+  orderBy: { createdAt: 'desc' },
+});
   });
 });
 
@@ -176,5 +184,38 @@ describe('NotificationsService.markRead', () => {
 
     expect(update).not.toHaveBeenCalled();
     expect(result).toBe(alreadyRead);
+  });
+});
+
+
+describe('NotificationsService.clearMine', () => {
+  it('clears only uncleared notifications belonging to the caller', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 2 });
+
+    const prisma = fakePrisma({
+      notification: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        updateMany,
+      },
+    });
+
+    const service = new NotificationsService(prisma);
+
+    await expect(service.clearMine('user-1')).resolves.toEqual({
+      clearedCount: 2,
+    });
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        clearedAt: null,
+      },
+      data: {
+        clearedAt: expect.any(Date),
+      },
+    });
   });
 });

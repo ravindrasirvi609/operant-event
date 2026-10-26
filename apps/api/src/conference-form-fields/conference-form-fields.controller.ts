@@ -37,13 +37,17 @@ export class ConferenceFormFieldsController {
     private readonly formFieldsService: ConferenceFormFieldsService,
   ) {}
 
+  /**
+   * Conference admins need to see both ACTIVE and DISABLED fields so that
+   * disabled fields can be enabled again from the Form Builder.
+   */
   @RequirePermissions(PERMISSIONS.CONFERENCE_READ)
   @Get()
-  findActive(
+  findAll(
     @CurrentOrganizationId() organizationId: string,
     @Param('conferenceId') conferenceId: string,
   ) {
-    return this.formFieldsService.findActive(organizationId, conferenceId);
+    return this.formFieldsService.findAll(organizationId, conferenceId);
   }
 
   @RequirePermissions(PERMISSIONS.CONFERENCE_UPDATE)
@@ -59,9 +63,9 @@ export class ConferenceFormFieldsController {
   @RequirePermissions(PERMISSIONS.CONFERENCE_UPDATE)
   @Patch(':fieldId')
   update(
-    @CurrentOrganizationId() organizationId: string,
     @Param('conferenceId') conferenceId: string,
     @Param('fieldId') fieldId: string,
+    @CurrentOrganizationId() organizationId: string,
     @Body() dto: UpdateFormFieldDto,
   ) {
     return this.formFieldsService.update(

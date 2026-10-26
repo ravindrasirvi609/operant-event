@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,78 +6,27 @@ datasource db {
   provider = "postgresql"
 }
 
-// ---------------------------------------------------------------------------
-// Phase 1 — Auth, Organization, RBAC, Conference
-// Spec: docs/plans/01-auth-organization-rbac-conference.md
-// ---------------------------------------------------------------------------
-
-enum OrganizationStatus {
-  ACTIVE
-  SUSPENDED
-  ARCHIVED
-}
-
-enum UserStatus {
-  INVITED
-  ACTIVE
-  SUSPENDED
-  DEACTIVATED
-}
-
-enum MembershipStatus {
-  INVITED
-  ACTIVE
-  DEACTIVATED
-}
-
-enum ConferenceStatus {
-  DRAFT
-  OPEN
-  REVIEW
-  REGISTRATION
-  ONGOING
-  COMPLETED
-  ARCHIVED
-}
-
-enum ReviewMode {
-  SINGLE_BLIND
-  DOUBLE_BLIND
-  OPEN
-}
-
-/**
- * GATEWAY: online payments through a configured provider (Razorpay/Stripe),
- * confirmed only by a verified webhook. MANUAL: no gateway is configured
- * for this conference — staff confirm payment received offline (bank
- * transfer/cash/cheque) through an audited approval action instead.
- */
-enum PaymentMode {
-  GATEWAY
-  MANUAL
-}
-
 model Organization {
-  id           String                   @id @default(cuid())
-  name         String
-  slug         String                   @unique
-  status       OrganizationStatus       @default(ACTIVE)
-  contactEmail String?
-  contactPhone String?
-  website      String?
-  logoFileId   String?
-  memberships  OrganizationMembership[]
-  roles        Role[]
-  conferences  Conference[]
-  files        File[]
-  auditLogs    AuditLog[]
-  reviewers    Reviewer[]
+  id             String                   @id @default(cuid())
+  name           String
+  slug           String                   @unique
+  status         OrganizationStatus       @default(ACTIVE)
+  contactEmail   String?
+  contactPhone   String?
+  website        String?
+  logoFileId     String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  auditLogs      AuditLog[]
+  conferences    Conference[]
   emailTemplates EmailTemplate[]
-  notifications  Notification[]
   exportJobs     ExportJob[]
+  files          File[]
   importJobs     ImportJob[]
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  notifications  Notification[]
+  memberships    OrganizationMembership[]
+  reviewers      Reviewer[]
+  roles          Role[]
 
   @@map("organizations")
 }
@@ -90,18 +36,19 @@ model User {
   email              String                   @unique
   passwordHash       String
   firstName          String
-  lastName            String
+  lastName           String
   status             UserStatus               @default(INVITED)
   emailVerifiedAt    DateTime?
   lastLoginAt        DateTime?
-  isSuperAdmin       Boolean                  @default(false)
-  memberships        OrganizationMembership[]
-  sessions           Session[]
-  passwordResets     PasswordResetToken[]
-  emailVerifications EmailVerificationToken[]
-  registrations      Registration[]
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
+  isSuperAdmin       Boolean                  @default(false)
+  emailVerifications EmailVerificationToken[]
+  memberships        OrganizationMembership[]
+  passwordResets     PasswordResetToken[]
+  registrations      Registration[]
+  sessions           Session[]
+  conferenceFeedbacks ConferenceFeedback[]
 
   @@map("users")
 }
@@ -113,9 +60,9 @@ model OrganizationMembership {
   status         MembershipStatus @default(INVITED)
   invitedAt      DateTime         @default(now())
   joinedAt       DateTime?
+  roles          MembershipRole[]
   organization   Organization     @relation(fields: [organizationId], references: [id])
   user           User             @relation(fields: [userId], references: [id])
-  roles          MembershipRole[]
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -128,9 +75,9 @@ model Role {
   name           String
   description    String?
   isSystem       Boolean          @default(false)
-  organization   Organization?    @relation(fields: [organizationId], references: [id])
-  permissions    RolePermission[]
   memberships    MembershipRole[]
+  permissions    RolePermission[]
+  organization   Organization?    @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, name])
   @@map("roles")
@@ -149,8 +96,8 @@ model Permission {
 model RolePermission {
   roleId       String
   permissionId String
-  role         Role       @relation(fields: [roleId], references: [id])
   permission   Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
@@ -174,8 +121,8 @@ model Session {
   ipAddress        String?
   expiresAt        DateTime
   revokedAt        DateTime?
-  user             User      @relation(fields: [userId], references: [id])
   createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@map("sessions")
@@ -187,8 +134,8 @@ model PasswordResetToken {
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  user      User      @relation(fields: [userId], references: [id])
   createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 
   @@map("password_reset_tokens")
 }
@@ -199,50 +146,51 @@ model EmailVerificationToken {
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  user      User      @relation(fields: [userId], references: [id])
   createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 
   @@map("email_verification_tokens")
 }
 
 model Conference {
-  id             String            @id @default(cuid())
-  organizationId String
-  name           String
-  slug           String
-  shortName      String?
-  description    String?
-  startDate      DateTime
-  endDate        DateTime
-  timezone       String
-  venueName      String?
-  venueAddress   String?
-  city           String?
-  country        String?
-  website        String?
-  contactEmail   String?
-  logoFileId     String?
-  bannerFileId   String?
-  status         ConferenceStatus  @default(DRAFT)
-  scheduleVersion Int              @default(0)
-  createdBy      String
-  organization   Organization      @relation(fields: [organizationId], references: [id])
-  settings       ConferenceSetting?
-  tracks         ConferenceTrack[]
-  formFields     ConferenceFormField[]
-  abstracts      Abstract[]
+  id                     String                 @id @default(cuid())
+  organizationId         String
+  name                   String
+  slug                   String
+  shortName              String?
+  description            String?
+  startDate              DateTime
+  endDate                DateTime
+  timezone               String
+  venueName              String?
+  venueAddress           String?
+  city                   String?
+  country                String?
+  website                String?
+  contactEmail           String?
+  logoFileId             String?
+  bannerFileId           String?
+  status                 ConferenceStatus       @default(DRAFT)
+  scheduleVersion        Int                    @default(0)
+  createdBy              String
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  abstracts              Abstract[]
+  attendances            Attendance[]
+  certificates           Certificate[]
+  feedbacks              ConferenceFeedback[]
+  checkins               Checkin[]
+  formFields             ConferenceFormField[]
+  settings               ConferenceSetting?
+  tracks                 ConferenceTrack[]
+  organization           Organization           @relation(fields: [organizationId], references: [id])
+  exhibitors             Exhibitor[]
+  orders                 Order[]
+  sessions               ProgramSession[]
   registrationCategories RegistrationCategory[]
-  registrations  Registration[]
-  orders         Order[]
-  sessions       ProgramSession[]
-  speakers       Speaker[]
-  checkins       Checkin[]
-  attendances    Attendance[]
-  certificates   Certificate[]
-  sponsors       Sponsor[]
-  exhibitors     Exhibitor[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  registrations          Registration[]
+  speakers               Speaker[]
+  sponsors               Sponsor[]
 
   @@unique([organizationId, slug])
   @@index([organizationId, status])
@@ -250,42 +198,46 @@ model Conference {
 }
 
 model ConferenceSetting {
-  id                    String     @id @default(cuid())
-  conferenceId          String     @unique
-  abstractEnabled       Boolean    @default(false)
-  abstractStartDate     DateTime?
-  abstractEndDate       DateTime?
-  reviewEnabled         Boolean    @default(false)
-  reviewMode            ReviewMode @default(SINGLE_BLIND)
-  registrationEnabled   Boolean    @default(false)
-  registrationStartDate DateTime?
-  registrationEndDate   DateTime?
-  paymentEnabled        Boolean    @default(false)
-  paymentMode           PaymentMode @default(MANUAL)
-  manualPaymentInstructions String?
-  certificateEnabled    Boolean    @default(false)
-  checkinEnabled        Boolean    @default(false)
-  preventSpeakerOverlap Boolean    @default(false)
-  certificateAttendanceThreshold Int @default(1)
-  certificateReviewThreshold     Int @default(1)
-  certificateShowFullName        Boolean @default(true)
-  conference            Conference @relation(fields: [conferenceId], references: [id])
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  id                             String      @id @default(cuid())
+  conferenceId                   String      @unique
+  abstractEnabled                Boolean     @default(false)
+  abstractStartDate              DateTime?
+  abstractEndDate                DateTime?
+  reviewEnabled                  Boolean     @default(false)
+  reviewMode                     ReviewMode  @default(SINGLE_BLIND)
+  registrationEnabled            Boolean     @default(false)
+  registrationStartDate          DateTime?
+  registrationEndDate            DateTime?
+  paymentEnabled                 Boolean     @default(false)
+  paymentMode                    PaymentMode @default(MANUAL)
+  manualPaymentInstructions      String?
+  certificateEnabled             Boolean     @default(false)
+  checkinEnabled                 Boolean     @default(false)
+  preventSpeakerOverlap          Boolean     @default(false)
+  certificateAttendanceThreshold Int         @default(1)
+  certificateReviewThreshold     Int         @default(1)
+  certificateShowFullName        Boolean     @default(true)
+  certificateTemplateFileId          String?   @map("certificatetemplatefileid")
+  certificateTemplateMimeType        String?   @map("certificatetemplatemimetype")
+  certificateTemplateFieldPositions  Json?     @map("certificatetemplatefieldpositions")
+  certificateTemplateUpdatedAt       DateTime? @map("certificatetemplateupdatedat")
+  createdAt                      DateTime    @default(now())
+  updatedAt                      DateTime    @updatedAt
+  conference                     Conference  @relation(fields: [conferenceId], references: [id])
 
   @@map("conference_settings")
 }
 
 model ConferenceTrack {
-  id           String     @id @default(cuid())
+  id           String           @id @default(cuid())
   conferenceId String
   name         String
   code         String?
   description  String?
-  sortOrder    Int        @default(0)
-  status       String     @default("ACTIVE")
-  conference   Conference @relation(fields: [conferenceId], references: [id])
+  sortOrder    Int              @default(0)
+  status       String           @default("ACTIVE")
   abstracts    Abstract[]
+  conference   Conference       @relation(fields: [conferenceId], references: [id])
   sessions     ProgramSession[]
 
   @@index([conferenceId])
@@ -301,8 +253,8 @@ model File {
   size           Int
   bucket         String
   uploadedBy     String
-  organization   Organization? @relation(fields: [organizationId], references: [id])
   createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
   @@map("files")
@@ -320,46 +272,12 @@ model AuditLog {
   newValues      Json?
   ipAddress      String?
   userAgent      String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
   createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, createdAt])
   @@index([conferenceId, createdAt])
   @@map("audit_logs")
-}
-
-// ---------------------------------------------------------------------------
-// Phase 2 — Abstract Submission, Authors, Dynamic Form
-// Spec: docs/plans/02-abstract-submission.md
-// ---------------------------------------------------------------------------
-
-enum FormFieldType {
-  TEXT
-  LONG_TEXT
-  RICH_TEXT
-  NUMBER
-  DATE
-  SELECT
-  MULTI_SELECT
-  RADIO
-  CHECKBOX
-  FILE
-  URL
-}
-
-enum AbstractStatus {
-  DRAFT
-  SUBMITTED
-  SCREENING
-  UNDER_REVIEW
-  REVISION_REQUIRED
-  RESUBMITTED
-  ACCEPTED
-  REJECTED
-  WAITLISTED
-  SCHEDULED
-  PRESENTED
-  WITHDRAWN
 }
 
 model ConferenceFormField {
@@ -373,10 +291,10 @@ model ConferenceFormField {
   optionsJson    Json?
   validationJson Json?
   sortOrder      Int           @default(0)
-  status         String        @default("ACTIVE") // ACTIVE | DISABLED — never deleted, see ABS-002
-  conference     Conference    @relation(fields: [conferenceId], references: [id])
+  status         String        @default("ACTIVE")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  conference     Conference    @relation(fields: [conferenceId], references: [id])
 
   @@unique([conferenceId, fieldKey])
   @@index([conferenceId, status])
@@ -384,27 +302,27 @@ model ConferenceFormField {
 }
 
 model Abstract {
-  id                     String           @id @default(cuid())
-  conferenceId           String
-  trackId                String?
-  submissionNumber       String?
-  title                  String
-  submissionType         String // ORAL | POSTER | E_POSTER | WORKSHOP | SYMPOSIUM
-  presentationPreference String?
-  status                 AbstractStatus   @default(DRAFT)
-  submittedBy            String
-  currentVersionId       String?
-  submittedAt            DateTime?
-  conference             Conference       @relation(fields: [conferenceId], references: [id])
-  track                  ConferenceTrack? @relation(fields: [trackId], references: [id])
-  versions               AbstractVersion[]
-  authors                AbstractAuthor[]
-  reviewAssignments      ReviewAssignment[]
-  decisions              AbstractDecision[]
-  revisionRequests       AbstractRevisionRequest[]
+  id                      String                    @id @default(cuid())
+  conferenceId            String
+  trackId                 String?
+  submissionNumber        String?
+  title                   String
+  submissionType          String
+  presentationPreference  String?
+  status                  AbstractStatus            @default(DRAFT)
+  submittedBy             String
+  currentVersionId        String?
+  submittedAt             DateTime?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  authors                 AbstractAuthor[]
+  decisions               AbstractDecision[]
+  revisionRequests        AbstractRevisionRequest[]
+  versions                AbstractVersion[]
+  conference              Conference                @relation(fields: [conferenceId], references: [id])
+  track                   ConferenceTrack?          @relation(fields: [trackId], references: [id])
   presentationAssignments PresentationAssignment[]
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  reviewAssignments       ReviewAssignment[]
 
   @@unique([conferenceId, submissionNumber])
   @@index([conferenceId, status])
@@ -436,8 +354,8 @@ model Author {
   department  String?
   city        String?
   country     String?
-  abstracts   AbstractAuthor[]
   createdAt   DateTime         @default(now())
+  abstracts   AbstractAuthor[]
 
   @@map("authors")
 }
@@ -457,43 +375,15 @@ model AbstractAuthor {
   @@map("abstract_authors")
 }
 
-// ---------------------------------------------------------------------------
-// Phase 3 — Reviewer Management, Assignments, Reviews, Decisions
-// Spec: docs/plans/03-review-management.md
-// ---------------------------------------------------------------------------
-
-enum ReviewAssignmentStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  DECLINED
-  OVERDUE
-  CANCELLED
-}
-
-enum ReviewRecommendation {
-  ACCEPT
-  REJECT
-  MINOR_REVISION
-  MAJOR_REVISION
-}
-
-enum AbstractDecisionType {
-  ACCEPTED
-  REJECTED
-  REVISION_REQUIRED
-  WAITLISTED
-}
-
 model Reviewer {
-  id             String            @id @default(cuid())
+  id             String             @id @default(cuid())
   organizationId String
   userId         String
-  status         String            @default("ACTIVE")
-  organization   Organization      @relation(fields: [organizationId], references: [id])
-  profile        ReviewerProfile?
+  status         String             @default("ACTIVE")
+  createdAt      DateTime           @default(now())
   assignments    ReviewAssignment[]
-  createdAt      DateTime          @default(now())
+  profile        ReviewerProfile?
+  organization   Organization       @relation(fields: [organizationId], references: [id])
 
   @@unique([organizationId, userId])
   @@map("reviewers")
@@ -532,31 +422,31 @@ model ReviewAssignment {
 }
 
 model Review {
-  id                 String               @id @default(cuid())
-  assignmentId       String               @unique
-  overallScore       Int
-  originalityScore   Int
-  methodologyScore   Int
-  significanceScore  Int
-  presentationScore  Int
-  commentsToAuthor   String?
-  privateComments    String?
-  recommendation     ReviewRecommendation
-  submittedAt        DateTime             @default(now())
-  assignment         ReviewAssignment     @relation(fields: [assignmentId], references: [id])
+  id                String               @id @default(cuid())
+  assignmentId      String               @unique
+  overallScore      Int
+  originalityScore  Int
+  methodologyScore  Int
+  significanceScore Int
+  presentationScore Int
+  commentsToAuthor  String?
+  privateComments   String?
+  recommendation    ReviewRecommendation
+  submittedAt       DateTime             @default(now())
+  assignment        ReviewAssignment     @relation(fields: [assignmentId], references: [id])
 
   @@map("reviews")
 }
 
 model AbstractDecision {
-  id                String               @id @default(cuid())
-  abstractId        String
-  decision          AbstractDecisionType
-  reason            String?
-  decidedBy         String
+  id                 String               @id @default(cuid())
+  abstractId         String
+  decision           AbstractDecisionType
+  reason             String?
+  decidedBy          String
   effectiveVersionId String?
-  decidedAt         DateTime             @default(now())
-  abstract          Abstract             @relation(fields: [abstractId], references: [id])
+  decidedAt          DateTime             @default(now())
+  abstract           Abstract             @relation(fields: [abstractId], references: [id])
 
   @@index([abstractId])
   @@map("abstract_decisions")
@@ -569,17 +459,508 @@ model AbstractRevisionRequest {
   reason      String
   dueDate     DateTime?
   resolvedAt  DateTime?
-  abstract    Abstract  @relation(fields: [abstractId], references: [id])
   createdAt   DateTime  @default(now())
+  abstract    Abstract  @relation(fields: [abstractId], references: [id])
 
   @@index([abstractId])
   @@map("abstract_revision_requests")
 }
 
-// ---------------------------------------------------------------------------
-// Phase 4 — Registration, Pricing, Payment, Invoice
-// Spec: docs/plans/04-registration-payments.md
-// ---------------------------------------------------------------------------
+model RegistrationCategory {
+  id           String             @id @default(cuid())
+  conferenceId String
+  name         String
+  description  String?
+  conference   Conference         @relation(fields: [conferenceId], references: [id])
+  types        RegistrationType[]
+
+  @@index([conferenceId])
+  @@map("registration_categories")
+}
+
+model RegistrationType {
+  id            String               @id @default(cuid())
+  categoryId    String
+  name          String
+  price         Decimal              @db.Decimal(10, 2)
+  currency      String
+  startDate     DateTime
+  endDate       DateTime
+  capacity      Int?
+  category      RegistrationCategory @relation(fields: [categoryId], references: [id])
+  registrations Registration[]
+
+  @@index([categoryId, startDate, endDate])
+  @@map("registration_types")
+}
+
+model Registration {
+  id                 String             @id @default(cuid())
+  conferenceId       String
+  registrationNumber String             @unique
+  userId             String
+  registrationTypeId String
+  status             RegistrationStatus @default(PENDING)
+  totalAmount        Decimal            @db.Decimal(10, 2)
+  currency           String
+  qrCode             String?            @unique
+  registeredAt       DateTime           @default(now())
+  attendances        Attendance[]
+  certificates       Certificate[]
+  checkins           Checkin[]
+  order              Order?
+  conference         Conference         @relation(fields: [conferenceId], references: [id])
+  registrationType   RegistrationType   @relation(fields: [registrationTypeId], references: [id])
+  user               User               @relation(fields: [userId], references: [id])
+
+  @@index([conferenceId, status])
+  @@index([registrationTypeId])
+  @@map("registrations")
+}
+
+model Order {
+  id             String       @id @default(cuid())
+  conferenceId   String
+  registrationId String       @unique
+  orderNumber    String       @unique
+  subtotal       Decimal      @db.Decimal(10, 2)
+  discount       Decimal      @default(0) @db.Decimal(10, 2)
+  tax            Decimal      @default(0) @db.Decimal(10, 2)
+  total          Decimal      @db.Decimal(10, 2)
+  currency       String
+  status         OrderStatus  @default(PENDING)
+  invoice        Invoice?
+  items          OrderItem[]
+  conference     Conference   @relation(fields: [conferenceId], references: [id])
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  payments       Payment[]
+
+  @@index([conferenceId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  itemType    String
+  referenceId String?
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  totalPrice  Decimal @db.Decimal(10, 2)
+  order       Order   @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  provider          String
+  providerOrderId   String?
+  providerPaymentId String?       @unique
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String
+  status            PaymentStatus @default(INITIATED)
+  reference         String?
+  proofFileId       String?
+  decidedBy         String?
+  rejectionReason   String?
+  paidAt            DateTime?
+  order             Order         @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String
+  payloadHash String
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, eventId])
+  @@map("webhook_events")
+}
+
+model Invoice {
+  id             String   @id @default(cuid())
+  invoiceNumber  String   @unique
+  orderId        String   @unique
+  subtotal       Decimal  @db.Decimal(10, 2)
+  discount       Decimal  @db.Decimal(10, 2)
+  tax            Decimal  @db.Decimal(10, 2)
+  total          Decimal  @db.Decimal(10, 2)
+  documentFileId String?
+  issuedAt       DateTime @default(now())
+  order          Order    @relation(fields: [orderId], references: [id])
+
+  @@map("invoices")
+}
+
+model ProgramSession {
+  id            String                   @id @default(cuid())
+  conferenceId  String
+  trackId       String?
+  title         String
+  description   String?
+  room          String?
+  sessionDate   DateTime
+  startTime     DateTime
+  endTime       DateTime
+  sessionType   String?
+  chairId       String?
+  coChairId     String?
+  status        String                   @default("DRAFT")
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  attendances   Attendance[]
+  presentations PresentationAssignment[]
+  conference    Conference               @relation(fields: [conferenceId], references: [id])
+  track         ConferenceTrack?         @relation(fields: [trackId], references: [id])
+  speakers      SessionSpeaker[]
+
+  @@index([conferenceId, sessionDate])
+  @@map("program_sessions")
+}
+
+model Speaker {
+  id            String                   @id @default(cuid())
+  conferenceId  String
+  userId        String?
+  name          String
+  designation   String?
+  institution   String?
+  bio           String?
+  photoFileId   String?
+  country       String?
+  sessions      SessionSpeaker[]
+  presentations PresentationAssignment[]
+  conference    Conference               @relation(fields: [conferenceId], references: [id])
+
+  @@index([conferenceId])
+  @@map("speakers")
+}
+
+model SessionSpeaker {
+  sessionId String
+  speakerId String
+  role      String
+  session   ProgramSession @relation(fields: [sessionId], references: [id])
+  speaker   Speaker        @relation(fields: [speakerId], references: [id])
+
+  @@id([sessionId, speakerId, role])
+  @@map("session_speakers")
+}
+
+model PresentationAssignment {
+  id                 String   @id @default(cuid())
+  sessionId          String
+  abstractId         String?
+  speakerId          String?
+  title              String?
+  speakerName        String?
+  speakerAffiliation String?
+  presentationType   String?
+  startTime          DateTime
+  endTime            DateTime
+  sortOrder          Int      @default(0)
+
+  abstract Abstract?      @relation(fields: [abstractId], references: [id])
+  session  ProgramSession @relation(fields: [sessionId], references: [id])
+  speaker  Speaker?       @relation(fields: [speakerId], references: [id])
+
+  @@unique([sessionId, abstractId])
+  @@index([abstractId])
+  @@index([speakerId])
+  @@map("presentation_assignments")
+}
+
+model Checkin {
+  id             String       @id @default(cuid())
+  conferenceId   String
+  registrationId String
+  checkinType    String
+  checkedInAt    DateTime     @default(now())
+  deviceId       String?
+  conference     Conference   @relation(fields: [conferenceId], references: [id])
+  registration   Registration @relation(fields: [registrationId], references: [id])
+
+  @@index([registrationId])
+  @@index([conferenceId, checkinType])
+  @@map("checkins")
+}
+
+model Attendance {
+  id             String          @id @default(cuid())
+  conferenceId   String
+  registrationId String
+  sessionId      String?
+  checkedInAt    DateTime        @default(now())
+  conference     Conference      @relation(fields: [conferenceId], references: [id])
+  registration   Registration    @relation(fields: [registrationId], references: [id])
+  session        ProgramSession? @relation(fields: [sessionId], references: [id])
+
+  @@index([registrationId])
+  @@index([sessionId])
+  @@map("attendances")
+}
+
+model Certificate {
+  id                String            @id @default(cuid())
+  conferenceId      String
+  registrationId    String
+  certificateType   String
+  certificateNumber String            @unique
+  fileId            String?
+  verificationCode  String            @unique
+  issuedAt          DateTime?
+  status            CertificateStatus @default(ELIGIBLE)
+  createdAt         DateTime          @default(now())
+  conference        Conference        @relation(fields: [conferenceId], references: [id])
+  registration      Registration      @relation(fields: [registrationId], references: [id])
+
+  @@unique([registrationId, certificateType])
+  @@index([conferenceId, status])
+  @@map("certificates")
+}
+
+model Sponsor {
+  id            String     @id @default(cuid())
+  conferenceId  String
+  name          String
+  tier          String
+  contactName   String?
+  contactEmail  String?
+  paymentStatus String     @default("PENDING")
+  logoFileId    String?
+  website       String?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  conference    Conference @relation(fields: [conferenceId], references: [id])
+
+  @@index([conferenceId])
+  @@map("sponsors")
+}
+
+model Exhibitor {
+  id            String           @id @default(cuid())
+  conferenceId  String
+  companyName   String
+  boothNumber   String?
+  contactPerson String?
+  paymentStatus String           @default("PENDING")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  staff         ExhibitorStaff[]
+  conference    Conference       @relation(fields: [conferenceId], references: [id])
+
+  @@index([conferenceId])
+  @@map("exhibitors")
+}
+
+model ExhibitorStaff {
+  id          String    @id @default(cuid())
+  exhibitorId String
+  name        String
+  email       String?
+  exhibitor   Exhibitor @relation(fields: [exhibitorId], references: [id])
+
+  @@index([exhibitorId])
+  @@map("exhibitor_staff")
+}
+
+model EmailTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  conferenceId   String?
+  event          String
+  subject        String
+  body           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, conferenceId, event])
+  @@map("email_templates")
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  type           String
+  title          String
+  message        String
+  data           Json?
+  entityType     String?
+  entityId       String?
+  readAt         DateTime?
+  clearedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model ExportJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  conferenceId   String?
+  requestedBy    String
+  type           String
+  status         String       @default("QUEUED")
+  resultFileId   String?
+  error          String?
+  createdAt      DateTime     @default(now())
+  completedAt    DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@map("export_jobs")
+}
+
+model ImportJob {
+  id                String       @id @default(cuid())
+  organizationId    String
+  conferenceId      String?
+  requestedBy       String
+  type              String
+  status            String       @default("QUEUED")
+  sourceFileId      String
+  errorReportFileId String?
+  rowsProcessed     Int          @default(0)
+  rowsFailed        Int          @default(0)
+  createdAt         DateTime     @default(now())
+  completedAt       DateTime?
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@map("import_jobs")
+}
+
+
+model ConferenceFeedback {
+  id             String   @id @default(cuid())
+  conferenceId   String
+  userId         String
+  rating         Int
+  contentRating  String
+  comments       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conference Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conferenceId, userId])
+  @@index([userId])
+  @@map("conference_feedback")
+}
+
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DEACTIVATED
+}
+
+enum ConferenceStatus {
+  DRAFT
+  OPEN
+  REVIEW
+  REGISTRATION
+  ONGOING
+  COMPLETED
+  ARCHIVED
+}
+
+enum ReviewMode {
+  SINGLE_BLIND
+  DOUBLE_BLIND
+  OPEN
+}
+
+/// *
+///  * GATEWAY: online payments through a configured provider (Razorpay/Stripe),
+///  * confirmed only by a verified webhook. MANUAL: no gateway is configured
+///  * for this conference — staff confirm payment received offline (bank
+///  * transfer/cash/cheque) through an audited approval action instead.
+enum PaymentMode {
+  GATEWAY
+  MANUAL
+}
+
+enum FormFieldType {
+  TEXT
+  LONG_TEXT
+  RICH_TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  RADIO
+  CHECKBOX
+  FILE
+  URL
+  AUTHOR_BLOCK
+}
+
+enum AbstractStatus {
+  DRAFT
+  SUBMITTED
+  SCREENING
+  UNDER_REVIEW
+  REVISION_REQUIRED
+  RESUBMITTED
+  ACCEPTED
+  REJECTED
+  WAITLISTED
+  SCHEDULED
+  PRESENTED
+  WITHDRAWN
+}
+
+enum ReviewAssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  OVERDUE
+  CANCELLED
+}
+
+enum ReviewRecommendation {
+  ACCEPT
+  REJECT
+  MINOR_REVISION
+  MAJOR_REVISION
+}
+
+enum AbstractDecisionType {
+  ACCEPTED
+  REJECTED
+  REVISION_REQUIRED
+  WAITLISTED
+}
 
 enum RegistrationStatus {
   PENDING
@@ -607,151 +988,6 @@ enum PaymentStatus {
   REFUNDED
 }
 
-model RegistrationCategory {
-  id           String @id @default(cuid())
-  conferenceId String
-  name         String
-  description  String?
-  conference   Conference @relation(fields: [conferenceId], references: [id])
-  types        RegistrationType[]
-
-  @@index([conferenceId])
-  @@map("registration_categories")
-}
-
-model RegistrationType {
-  id            String   @id @default(cuid())
-  categoryId    String
-  name          String
-  price         Decimal  @db.Decimal(10, 2)
-  currency      String
-  startDate     DateTime
-  endDate       DateTime
-  capacity      Int?
-  category      RegistrationCategory @relation(fields: [categoryId], references: [id])
-  registrations Registration[]
-
-  @@index([categoryId, startDate, endDate])
-  @@map("registration_types")
-}
-
-model Registration {
-  id                 String   @id @default(cuid())
-  conferenceId       String
-  registrationNumber String   @unique
-  userId             String
-  registrationTypeId String
-  status             RegistrationStatus @default(PENDING)
-  totalAmount        Decimal  @db.Decimal(10, 2)
-  currency           String
-  qrCode             String?  @unique
-  registeredAt       DateTime @default(now())
-  conference         Conference @relation(fields: [conferenceId], references: [id])
-  registrationType   RegistrationType @relation(fields: [registrationTypeId], references: [id])
-  user               User     @relation(fields: [userId], references: [id])
-  order              Order?
-  checkins           Checkin[]
-  attendances        Attendance[]
-  certificates       Certificate[]
-
-  @@index([conferenceId, status])
-  @@index([registrationTypeId])
-  @@map("registrations")
-}
-
-model Order {
-  id             String @id @default(cuid())
-  conferenceId   String
-  registrationId String @unique
-  orderNumber    String @unique
-  subtotal       Decimal @db.Decimal(10, 2)
-  discount       Decimal @db.Decimal(10, 2) @default(0)
-  tax            Decimal @db.Decimal(10, 2) @default(0)
-  total          Decimal @db.Decimal(10, 2)
-  currency       String
-  status         OrderStatus @default(PENDING)
-  conference     Conference @relation(fields: [conferenceId], references: [id])
-  registration   Registration @relation(fields: [registrationId], references: [id])
-  items          OrderItem[]
-  payments       Payment[]
-  invoice        Invoice?
-
-  @@index([conferenceId, status])
-  @@map("orders")
-}
-
-model OrderItem {
-  id           String @id @default(cuid())
-  orderId      String
-  itemType     String
-  referenceId  String?
-  description  String
-  quantity     Int    @default(1)
-  unitPrice    Decimal @db.Decimal(10, 2)
-  totalPrice   Decimal @db.Decimal(10, 2)
-  order        Order @relation(fields: [orderId], references: [id])
-
-  @@index([orderId])
-  @@map("order_items")
-}
-
-model Payment {
-  id                String @id @default(cuid())
-  orderId           String
-  provider          String // razorpay | stripe | MANUAL
-  providerOrderId   String?
-  providerPaymentId String? @unique
-  amount            Decimal @db.Decimal(10, 2)
-  currency          String
-  status            PaymentStatus @default(INITIATED)
-  reference         String? // e.g. bank transfer UTR / cheque number, manual mode only
-  proofFileId       String? // Files module reference, manual mode only
-  decidedBy         String? // staff user id who approved/rejected a manual claim
-  rejectionReason   String? // organizer's free-text reason for a manual claim rejection
-  paidAt            DateTime?
-  order             Order @relation(fields: [orderId], references: [id])
-
-  @@index([orderId])
-  @@map("payments")
-}
-
-model WebhookEvent {
-  id          String @id @default(cuid())
-  provider    String
-  eventId     String
-  payloadHash String
-  processedAt DateTime?
-  createdAt   DateTime @default(now())
-
-  @@unique([provider, eventId])
-  @@map("webhook_events")
-}
-
-model Invoice {
-  id             String @id @default(cuid())
-  invoiceNumber  String @unique
-  orderId        String @unique
-  subtotal       Decimal @db.Decimal(10, 2)
-  discount       Decimal @db.Decimal(10, 2)
-  tax            Decimal @db.Decimal(10, 2)
-  total          Decimal @db.Decimal(10, 2)
-  documentFileId String?
-  order          Order @relation(fields: [orderId], references: [id])
-  issuedAt       DateTime @default(now())
-
-  @@map("invoices")
-}
-
-// ---------------------------------------------------------------------------
-// Phase 5 — Program (Sessions/Speakers/Schedule), Check-in, Certificates
-// Spec: docs/plans/05-program-checkin-certificates.md
-//
-// The SRS calls the schedule-builder entity "Session" — renamed to
-// ProgramSession here because Phase 1 already defines a `Session` model
-// for JWT refresh-token sessions (auth), and Prisma model names must be
-// unique across the whole schema.
-// ---------------------------------------------------------------------------
-
 enum CertificateStatus {
   ELIGIBLE
   GENERATED
@@ -759,239 +995,4 @@ enum CertificateStatus {
   REVOKED
 }
 
-model ProgramSession {
-  id            String    @id @default(cuid())
-  conferenceId  String
-  trackId       String?
-  title         String
-  description   String?
-  room          String?
-  sessionDate   DateTime
-  startTime     DateTime
-  endTime       DateTime
-  sessionType   String?
-  chairId       String?
-  coChairId     String?
-  status        String    @default("DRAFT") // DRAFT | PUBLISHED
-  conference    Conference @relation(fields: [conferenceId], references: [id])
-  track         ConferenceTrack? @relation(fields: [trackId], references: [id])
-  speakers      SessionSpeaker[]
-  presentations PresentationAssignment[]
-  attendances   Attendance[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 
-  @@index([conferenceId, sessionDate])
-  @@map("program_sessions")
-}
-
-model Speaker {
-  id           String @id @default(cuid())
-  conferenceId String
-  userId       String?
-  name         String
-  designation  String?
-  institution  String?
-  bio          String?
-  photoFileId  String?
-  country      String?
-  conference   Conference @relation(fields: [conferenceId], references: [id])
-  sessions     SessionSpeaker[]
-
-  @@index([conferenceId])
-  @@map("speakers")
-}
-
-model SessionSpeaker {
-  sessionId String
-  speakerId String
-  role      String // SPEAKER | CHAIR | CO_CHAIR | KEYNOTE
-  session   ProgramSession @relation(fields: [sessionId], references: [id])
-  speaker   Speaker        @relation(fields: [speakerId], references: [id])
-
-  @@id([sessionId, speakerId, role])
-  @@map("session_speakers")
-}
-
-model PresentationAssignment {
-  id               String   @id @default(cuid())
-  sessionId        String
-  abstractId       String
-  presentationType String?
-  startTime        DateTime
-  endTime          DateTime
-  sortOrder        Int      @default(0)
-  session          ProgramSession @relation(fields: [sessionId], references: [id])
-  abstract         Abstract       @relation(fields: [abstractId], references: [id])
-
-  @@unique([sessionId, abstractId])
-  @@index([abstractId])
-  @@map("presentation_assignments")
-}
-
-model Checkin {
-  id             String   @id @default(cuid())
-  conferenceId   String
-  registrationId String
-  checkinType    String   // MAIN_EVENT | WORKSHOP | SESSION | BANQUET
-  checkedInAt    DateTime @default(now())
-  deviceId       String?
-  conference     Conference   @relation(fields: [conferenceId], references: [id])
-  registration   Registration @relation(fields: [registrationId], references: [id])
-
-  @@index([registrationId])
-  @@index([conferenceId, checkinType])
-  @@map("checkins")
-}
-
-model Attendance {
-  id             String   @id @default(cuid())
-  conferenceId   String
-  registrationId String
-  sessionId      String?
-  checkedInAt    DateTime @default(now())
-  conference     Conference     @relation(fields: [conferenceId], references: [id])
-  registration   Registration   @relation(fields: [registrationId], references: [id])
-  session        ProgramSession? @relation(fields: [sessionId], references: [id])
-
-  @@index([registrationId])
-  @@index([sessionId])
-  @@map("attendances")
-}
-
-model Certificate {
-  id                String    @id @default(cuid())
-  conferenceId      String
-  registrationId    String
-  certificateType   String    // PARTICIPATION | PRESENTATION | SPEAKER | REVIEWER | CHAIR | WORKSHOP
-  certificateNumber String    @unique
-  fileId            String?
-  verificationCode  String    @unique
-  issuedAt          DateTime?
-  status            CertificateStatus @default(ELIGIBLE)
-  conference        Conference   @relation(fields: [conferenceId], references: [id])
-  registration      Registration @relation(fields: [registrationId], references: [id])
-  createdAt         DateTime  @default(now())
-
-  @@unique([registrationId, certificateType])
-  @@index([conferenceId, status])
-  @@map("certificates")
-}
-
-// ---------------------------------------------------------------------------
-// Phase 6 — Sponsors/Exhibitors, Notifications, Reports, Export/Import
-// Spec: docs/plans/06-reports-sponsors-notifications.md
-// ---------------------------------------------------------------------------
-
-model Sponsor {
-  id            String @id @default(cuid())
-  conferenceId  String
-  name          String
-  tier          String // PLATINUM | GOLD | SILVER | BRONZE
-  contactName   String?
-  contactEmail  String?
-  paymentStatus String @default("PENDING")
-  logoFileId    String?
-  conference    Conference @relation(fields: [conferenceId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([conferenceId])
-  @@map("sponsors")
-}
-
-model Exhibitor {
-  id            String @id @default(cuid())
-  conferenceId  String
-  companyName   String
-  boothNumber   String?
-  contactPerson String?
-  paymentStatus String @default("PENDING")
-  conference    Conference @relation(fields: [conferenceId], references: [id])
-  staff         ExhibitorStaff[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([conferenceId])
-  @@map("exhibitors")
-}
-
-model ExhibitorStaff {
-  id          String @id @default(cuid())
-  exhibitorId String
-  name        String
-  email       String?
-  exhibitor   Exhibitor @relation(fields: [exhibitorId], references: [id])
-
-  @@index([exhibitorId])
-  @@map("exhibitor_staff")
-}
-
-model EmailTemplate {
-  id             String  @id @default(cuid())
-  organizationId String
-  conferenceId   String? // null = organization-wide default, overridable per conference
-  event          String  // matches a notification trigger event name, e.g. "abstract.accepted"
-  subject        String
-  body           String  // template source; variables like {{participantName}}
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@unique([organizationId, conferenceId, event])
-  @@map("email_templates")
-}
-
-model Notification {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String
-  type           String
-  title          String
-  message        String
-  data           Json?
-  entityType     String?
-  entityId       String?
-  readAt         DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime @default(now())
-
-  @@index([userId, readAt])
-  @@map("notifications")
-}
-
-model ExportJob {
-  id             String   @id @default(cuid())
-  organizationId String
-  conferenceId   String?
-  requestedBy    String
-  type           String   // ABSTRACTS | REGISTRATIONS | PAYMENTS | AUDIT_LOG | ...
-  status         String   @default("QUEUED") // QUEUED | RUNNING | DONE | FAILED
-  resultFileId   String?
-  error          String?
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt      DateTime @default(now())
-  completedAt    DateTime?
-
-  @@index([organizationId, status])
-  @@map("export_jobs")
-}
-
-model ImportJob {
-  id                String   @id @default(cuid())
-  organizationId    String
-  conferenceId      String?
-  requestedBy       String
-  type              String   // AUTHORS | REVIEWERS | REGISTRATIONS
-  status            String   @default("QUEUED")
-  sourceFileId      String
-  errorReportFileId String?
-  rowsProcessed     Int      @default(0)
-  rowsFailed        Int      @default(0)
-  organization      Organization @relation(fields: [organizationId], references: [id])
-  createdAt         DateTime @default(now())
-  completedAt       DateTime?
-
-  @@index([organizationId, status])
-  @@map("import_jobs")
-}

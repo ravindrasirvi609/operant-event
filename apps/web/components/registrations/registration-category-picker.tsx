@@ -1,8 +1,8 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AsyncBoundary } from '@/components/query/async-boundary';
 import { apiGet } from '@/lib/api/client';
@@ -17,6 +17,7 @@ import type { RegistrationCategory } from '@/lib/registrations/types';
  */
 export function RegistrationCategoryPicker({ conferenceId }: { conferenceId: string }) {
   const router = useRouter();
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const categoriesQuery = useQuery({
     queryKey: ['conferences', conferenceId, 'registration-options'],
@@ -25,14 +26,20 @@ export function RegistrationCategoryPicker({ conferenceId }: { conferenceId: str
   const register = useRegister(conferenceId);
 
   async function handleRegister(categoryId: string) {
-    setError(null);
-    try {
-      const registration = await register.mutateAsync(categoryId);
-      router.push(`/registrations/${registration.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to register.');
-    }
+  if (submittingRef.current) return;
+
+  submittingRef.current = true;
+  setError(null);
+
+  try {
+    const registration = await register.mutateAsync(categoryId);
+    router.push(`/registrations/${registration.id}`);
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to register.');
+  } finally {
+    submittingRef.current = false;
   }
+}
 
   return (
     <div className="max-w-xl space-y-4">

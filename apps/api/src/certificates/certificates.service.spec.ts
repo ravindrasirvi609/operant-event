@@ -20,14 +20,19 @@ function fakeFilesService(
 
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
-    conference: { findFirst: jest.fn() },
+conferenceFeedback: {
+  findUnique: jest.fn(),
+  create: jest.fn(),
+},
+
+    conference: { findFirst: jest.fn(), findUnique: jest.fn() },
     conferenceSetting: {
       findUnique: jest.fn().mockResolvedValue({
         certificateEnabled: true,
         certificateShowFullName: true,
       }),
     },
-    registration: { findMany: jest.fn().mockResolvedValue([]) },
+    registration: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn() },
     certificate: {
       findUnique: jest.fn().mockResolvedValue(null),
       findFirst: jest.fn(),
@@ -508,6 +513,27 @@ describe('CertificatesService.verifyByCode', () => {
     });
   });
 
+  it('throws NotFoundException for a REVOKED certificate', async () => {
+    const prisma = fakePrisma({
+      certificate: {
+        findUnique: jest.fn().mockResolvedValue({ status: 'REVOKED' }),
+        findFirst: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    });
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      fakeEventEmitter(),
+      fakeFilesService(),
+    );
+
+    await expect(service.verifyByCode('REVOKED-CODE')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
   it('reveals only the first-name-plus-initial when certificateShowFullName is disabled', async () => {
     const prisma = fakePrisma({
       certificate: {
@@ -541,5 +567,60 @@ describe('CertificatesService.verifyByCode', () => {
     const result = await service.verifyByCode('ABC123');
 
     expect(result.holderName).toBe('Jane D.');
+  });
+});
+
+
+describe('CertificatesService.submitConferenceFeedback', () => {
+  it('saves feedback and emits the notification event', async () => {
+    const emit = jest.fn();
+    const feedback = { id: 'feedback-1' };
+
+    const prisma = fakePrisma({
+      registration: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'reg-1' }),
+      },
+      conferenceFeedback: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(feedback),
+      },
+      conference: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'conf-1',
+          name: 'Operant Summit 2027',
+          organizationId: 'org-1',
+        }),
+      },
+    });
+
+    const service = new CertificatesService(
+      prisma,
+      fakeEligibility(),
+      { emit } as unknown as EventEmitter2,
+      fakeFilesService(),
+    );
+
+    await expect(
+      service.submitConferenceFeedback('user-1', 'conf-1', {
+        rating: 5,
+        contentRating: 'Excellent',
+      }),
+    ).resolves.toEqual(feedback);
+
+    expect(emit).toHaveBeenCalledWith(
+      'conference.feedback_submitted',
+      expect.objectContaining({
+        organizationId: 'org-1',
+        conferenceId: 'conf-1',
+        userId: 'user-1',
+        templateData: expect.objectContaining({
+          conferenceName: 'Operant Summit 2027',
+          certificatesUrl: expect.stringContaining('/certificates'),
+        }),
+        entityType: 'conference_feedback',
+        entityId: 'feedback-1',
+      }),
+    );
   });
 });

@@ -23,10 +23,13 @@ describe('resolvePaymentBranch', () => {
   });
 
   it('branches to manual when the response carries manualPaymentInstructions', () => {
-    const result: CreateOrderResult = { order, manualPaymentInstructions: true };
+  const result: CreateOrderResult = {
+    order,
+    manualPaymentInstructions: 'Transfer payment to the organizer bank account.',
+  };
 
-    expect(resolvePaymentBranch(result)).toEqual({ mode: 'manual' });
-  });
+  expect(resolvePaymentBranch(result)).toEqual({ mode: 'manual' });
+});
 
   it('ignores a disagreeing externally-fetched payment mode and trusts the response shape only', () => {
     const result: CreateOrderResult = { order, checkoutUrl: 'https://gateway.example/checkout/xyz' };

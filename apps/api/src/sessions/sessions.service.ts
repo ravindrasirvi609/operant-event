@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ScheduleConflictService } from './schedule-conflict.service';
 import type { CreateSessionDto } from './dto/create-session.dto';
@@ -8,7 +13,26 @@ import type { SpeakerAssignmentDto } from './dto/assign-speakers.dto';
 const PROGRAM_INCLUDE = {
   track: true,
   speakers: { include: { speaker: true } },
-  presentations: true,
+  presentations: {
+    orderBy: { startTime: 'asc' as const },
+    include: {
+      abstract: {
+        select: {
+          id: true,
+          title: true,
+          submissionNumber: true,
+        },
+      },
+      speaker: {
+        select: {
+          id: true,
+          name: true,
+          designation: true,
+          institution: true,
+        },
+      },
+    },
+  },
 } as const;
 
 @Injectable()
@@ -23,10 +47,20 @@ export class SessionsService {
     conferenceId: string,
     dto: CreateSessionDto,
   ) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+    const conference = await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
+    this.assertSessionDateInConference(
+      dto.sessionDate,
+      conference.startDate,
+      conference.endDate,
+    );
 
     const startTime = new Date(dto.startTime);
     const endTime = new Date(dto.endTime);
+
     this.scheduleConflictService.assertValidWindow(startTime, endTime);
 
     return this.prisma.programSession.create({
@@ -55,10 +89,27 @@ export class SessionsService {
       sessionId,
     );
 
+    const conference = await this.assertConferenceInOrganization(
+      organizationId,
+      session.conferenceId,
+    );
+
+    const sessionDate = dto.sessionDate ?? session.sessionDate.toISOString();
+
+    this.assertSessionDateInConference(
+      sessionDate,
+      conference.startDate,
+      conference.endDate,
+    );
+
     const startTime = dto.startTime
       ? new Date(dto.startTime)
       : session.startTime;
-    const endTime = dto.endTime ? new Date(dto.endTime) : session.endTime;
+
+    const endTime = dto.endTime
+      ? new Date(dto.endTime)
+      : session.endTime;
+
     this.scheduleConflictService.assertValidWindow(startTime, endTime);
 
     const updated = await this.prisma.programSession.update({
@@ -67,7 +118,7 @@ export class SessionsService {
         ...(dto.trackId !== undefined && { trackId: dto.trackId }),
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.room !== undefined && { room: dto.room }),
+        ...(dto.room !== undefined && { room: dto.room.trim() }),
         ...(dto.sessionDate !== undefined && {
           sessionDate: new Date(dto.sessionDate),
         }),
@@ -77,9 +128,7 @@ export class SessionsService {
       },
     });
 
-    // §15.1: editing an already-PUBLISHED session doesn't silently mutate
-    // what's already public — it bumps a version marker instead, so any
-    // consumer caching the public schedule knows to refetch.
+    // Keep published-program versioning behavior.
     if (session.status === 'PUBLISHED') {
       await this.prisma.conference.update({
         where: { id: session.conferenceId },
@@ -92,6 +141,7 @@ export class SessionsService {
 
   async publish(organizationId: string, sessionId: string) {
     await this.assertSessionInOrganization(organizationId, sessionId);
+
     return this.prisma.programSession.update({
       where: { id: sessionId },
       data: { status: 'PUBLISHED' },
@@ -111,6 +161,7 @@ export class SessionsService {
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: session.conferenceId },
     });
+
     if (settings?.preventSpeakerOverlap) {
       for (const assignment of assignments) {
         await this.scheduleConflictService.assertNoSpeakerOverlap(
@@ -124,13 +175,17 @@ export class SessionsService {
       }
     }
 
-    const chair = assignments.find((assignment) => assignment.role === 'CHAIR');
+    const chair = assignments.find(
+      (assignment) => assignment.role === 'CHAIR',
+    );
+
     const coChair = assignments.find(
       (assignment) => assignment.role === 'CO_CHAIR',
     );
 
     return this.prisma.$transaction(async (tx) => {
       await tx.sessionSpeaker.deleteMany({ where: { sessionId } });
+
       await tx.sessionSpeaker.createMany({
         data: assignments.map((assignment) => ({
           sessionId,
@@ -138,6 +193,7 @@ export class SessionsService {
           role: assignment.role,
         })),
       });
+
       return tx.programSession.update({
         where: { id: sessionId },
         data: {
@@ -161,14 +217,23 @@ export class SessionsService {
       where: { id: sessionId, conference: { organizationId } },
       include: PROGRAM_INCLUDE,
     });
+
     if (!session) {
       throw new NotFoundException('Session not found.');
     }
+
     return session;
   }
 
-  async findAllForOrganizer(organizationId: string, conferenceId: string) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+  async findAllForOrganizer(
+    organizationId: string,
+    conferenceId: string,
+  ) {
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
     return this.prisma.programSession.findMany({
       where: { conferenceId },
       orderBy: { startTime: 'asc' },
@@ -179,13 +244,65 @@ export class SessionsService {
   private async assertConferenceInOrganization(
     organizationId: string,
     conferenceId: string,
-  ): Promise<void> {
+  ) {
     const conference = await this.prisma.conference.findFirst({
       where: { id: conferenceId, organizationId },
     });
+
     if (!conference) {
       throw new NotFoundException('Conference not found.');
     }
+
+    return conference;
+  }
+
+  private assertSessionDateInConference(
+    sessionDateInput: string | Date,
+    conferenceStartDate: Date,
+    conferenceEndDate: Date,
+  ): void {
+    const sessionDate = this.toCalendarDate(sessionDateInput);
+    const startDate = this.toCalendarDate(conferenceStartDate);
+    const endDate = this.toCalendarDate(conferenceEndDate);
+
+    if (
+      !sessionDate ||
+      !startDate ||
+      !endDate ||
+      sessionDate < startDate ||
+      sessionDate > endDate
+    ) {
+      throw new BadRequestException(
+        `Session date must be between ${startDate ?? 'unknown'} and ${endDate ?? 'unknown'}.`,
+      );
+    }
+  }
+
+  private toCalendarDate(value: string | Date): string | null {
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        return null;
+      }
+
+      return value.toISOString().slice(0, 10);
+    }
+
+    const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+
+    if (!match) {
+      return null;
+    }
+
+    const date = new Date(`${match[1]}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(date.getTime()) ||
+      date.toISOString().slice(0, 10) !== match[1]
+    ) {
+      return null;
+    }
+
+    return match[1];
   }
 
   private async assertSessionInOrganization(
@@ -195,9 +312,11 @@ export class SessionsService {
     const session = await this.prisma.programSession.findFirst({
       where: { id: sessionId, conference: { organizationId } },
     });
+
     if (!session) {
       throw new NotFoundException('Session not found.');
     }
+
     return session;
   }
 }
