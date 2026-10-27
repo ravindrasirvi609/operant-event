@@ -119,23 +119,30 @@ export function CertificateGenerationPanel({
   const activeMimeType = selectedFile?.type ?? templateMimeType;
   const isPdf = activeMimeType === 'application/pdf';
 
+  // Create and revoke a browser object URL for the selected local file.
   useEffect(() => {
     if (!selectedFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clear the previous local preview when no file is selected.
       setLocalPreviewUrl(null);
       return;
     }
 
     const url = URL.createObjectURL(selectedFile);
     setLocalPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
   }, [selectedFile]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialize editable positions from the asynchronously loaded conference settings.
     setPositions(settings?.certificateTemplateFieldPositions ?? DEFAULT_POSITIONS);
   }, [settings?.certificateTemplateFieldPositions]);
 
   useEffect(() => {
     if (!hasSavedTemplate || selectedFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clear the saved preview when it should no longer be displayed.
       setSavedPreviewUrl((current) => {
         if (current) URL.revokeObjectURL(current);
         return null;
