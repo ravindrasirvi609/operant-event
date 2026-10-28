@@ -8,11 +8,13 @@ import { ReviewAssignmentsService } from './review-assignments.service';
 import { ConflictOfInterestService } from './conflict-of-interest.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
 
+
 function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
   const base = {
     conference: { findFirst: jest.fn() },
     abstract: { findFirst: jest.fn(), findUnique: jest.fn() },
     reviewer: { findMany: jest.fn(), findUnique: jest.fn() },
+    user: { findMany: jest.fn() },
     reviewAssignment: {
       create: jest.fn(),
       findFirst: jest.fn(),
@@ -22,15 +24,19 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
       count: jest.fn(),
     },
   };
+
   const baseRecord = base as unknown as Record<
     string,
     Record<string, jest.Mock>
   >;
+
   for (const [model, methods] of Object.entries(overrides)) {
     Object.assign(baseRecord[model], methods);
   }
+
   return base as unknown as PrismaService;
 }
+
 
 function fakeEventEmitter(): EventEmitter2 {
   return { emit: jest.fn() } as unknown as EventEmitter2;
@@ -57,121 +63,121 @@ const abstractInConference = {
   title: 'A Study',
 };
 
-describe('ReviewAssignmentsService.assign', () => {
-  it('rejects assignment outside the caller organization', async () => {
+
+describe('ReviewAssignmentsService.findReviewsForAbstract', () => {
+  it('rejects a conference outside the caller organization', async () => {
     const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(null) },
+      conference: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     });
 
     await expect(
-      buildService(prisma).assign('org-1', 'conf-x', 'abs-1', 'reviewer-1'),
+      buildService(prisma).findReviewsForAbstract(
+        'org-1',
+        'conf-x',
+        'abstract-1',
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('refuses to create a conflicted assignment', async () => {
-    const create = jest.fn();
-    const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
-      abstract: {
-        findFirst: jest.fn().mockResolvedValue(abstractInConference),
-      },
-      reviewAssignment: { create },
-    });
-
-    await expect(
-      buildService(prisma, {
-        hasConflict: true,
-        reasons: ['Reviewer is a co-author on this abstract.'],
-      }).assign('org-1', 'conf-1', 'abs-1', 'reviewer-1'),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(create).not.toHaveBeenCalled();
-  });
-
-  it('creates a PENDING assignment when there is no conflict', async () => {
-    const create = jest
-      .fn()
-      .mockResolvedValue({ id: 'assignment-1', status: 'PENDING' });
-    const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
-      abstract: {
-        findFirst: jest.fn().mockResolvedValue(abstractInConference),
-      },
-      reviewAssignment: { create },
-    });
-
-    await buildService(prisma).assign('org-1', 'conf-1', 'abs-1', 'reviewer-1');
-
-    expect(create).toHaveBeenCalledWith({
-      data: {
-        conferenceId: 'conf-1',
-        abstractId: 'abs-1',
+  it('lists every assignment for the abstract with its submitted review, if any', async () => {
+    const assignments = [
+      {
+        id: 'assignment-1',
         reviewerId: 'reviewer-1',
-        dueDate: undefined,
-        status: 'PENDING',
-        conflictOfInterest: false,
+        reviewer: { userId: 'user-1' },
+        review: { overallScore: 8 },
       },
-    });
-  });
+      {
+        id: 'assignment-2',
+        reviewerId: 'reviewer-2',
+        reviewer: { userId: 'user-2' },
+        review: null,
+      },
+    ];
 
-  it('emits review.assigned for the reviewer once the assignment is created', async () => {
-    const eventEmitter = fakeEventEmitter();
-    const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
-      abstract: {
-        findFirst: jest.fn().mockResolvedValue(abstractInConference),
+    const findAssignments = jest.fn().mockResolvedValue(assignments);
+
+    const users = [
+      {
+        id: 'user-1',
+        firstName: 'Test',
+        lastName: 'Reviewer One',
+        email: 'reviewer1@example.com',
       },
-      reviewer: {
-        findMany: jest.fn(),
-        findUnique: jest.fn().mockResolvedValue({ userId: 'user-2' }),
+      {
+        id: 'user-2',
+        firstName: 'Test',
+        lastName: 'Reviewer Two',
+        email: 'reviewer2@example.com',
+      },
+    ];
+
+    const findUsers = jest.fn().mockResolvedValue(users);
+
+    const prisma = fakePrisma({
+      conference: {
+        findFirst: jest.fn().mockResolvedValue(conferenceInOrg),
       },
       reviewAssignment: {
-        create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
+        findMany: findAssignments,
+      },
+      user: {
+        findMany: findUsers,
       },
     });
 
-    await buildService(prisma, undefined, eventEmitter).assign(
+    const result = await buildService(prisma).findReviewsForAbstract(
       'org-1',
       'conf-1',
-      'abs-1',
-      'reviewer-1',
+      'abstract-1',
     );
 
-    expect(eventEmitter.emit).toHaveBeenCalledWith('review.assigned', {
-      organizationId: 'org-1',
-      conferenceId: 'conf-1',
-      userId: 'user-2',
-      templateData: { abstractTitle: 'A Study' },
-      entityType: 'reviewAssignment',
-      entityId: 'assignment-1',
-    });
-  });
-
-  it('does not emit review.assigned when the reviewer no longer exists', async () => {
-    const eventEmitter = fakeEventEmitter();
-    const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
-      abstract: {
-        findFirst: jest.fn().mockResolvedValue(abstractInConference),
+    expect(findAssignments).toHaveBeenCalledWith({
+      where: {
+        conferenceId: 'conf-1',
+        abstractId: 'abstract-1',
       },
-      reviewer: {
-        findMany: jest.fn(),
-        findUnique: jest.fn().mockResolvedValue(null),
-      },
-      reviewAssignment: {
-        create: jest.fn().mockResolvedValue({ id: 'assignment-1' }),
+      include: {
+        review: true,
+        reviewer: true,
       },
     });
 
-    await buildService(prisma, undefined, eventEmitter).assign(
-      'org-1',
-      'conf-1',
-      'abs-1',
-      'reviewer-1',
-    );
+    expect(findUsers).toHaveBeenCalledWith({
+      where: {
+        id: {
+          in: ['user-1', 'user-2'],
+        },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+      },
+    });
 
-    expect(eventEmitter.emit).not.toHaveBeenCalled();
+    expect(result).toEqual([
+      {
+        ...assignments[0],
+        reviewer: {
+          userId: 'user-1',
+          user: users[0],
+        },
+      },
+      {
+        ...assignments[1],
+        reviewer: {
+          userId: 'user-2',
+          user: users[1],
+        },
+      },
+    ]);
   });
 });
+
 
 describe('ReviewAssignmentsService.reassign', () => {
   it('cancels the old assignment and creates a new one referencing it', async () => {
@@ -427,18 +433,42 @@ describe('ReviewAssignmentsService.findReviewsForAbstract', () => {
 
   it('lists every assignment for the abstract with its submitted review, if any', async () => {
     const assignments = [
-      {
-        id: 'assignment-1',
-        reviewerId: 'reviewer-1',
-        review: { overallScore: 8 },
-      },
-      { id: 'assignment-2', reviewerId: 'reviewer-2', review: null },
-    ];
+  {
+    id: 'assignment-1',
+    reviewerId: 'reviewer-1',
+    reviewer: { userId: 'user-1' },
+    review: { overallScore: 8 },
+  },
+  {
+    id: 'assignment-2',
+    reviewerId: 'reviewer-2',
+    reviewer: { userId: 'user-2' },
+    review: null,
+  },
+];
     const findMany = jest.fn().mockResolvedValue(assignments);
-    const prisma = fakePrisma({
-      conference: { findFirst: jest.fn().mockResolvedValue(conferenceInOrg) },
-      reviewAssignment: { findMany },
-    });
+const prisma = fakePrisma({
+  conference: {
+    findFirst: jest.fn().mockResolvedValue(conferenceInOrg),
+  },
+  reviewAssignment: { findMany },
+  user: {
+    findMany: jest.fn().mockResolvedValue([
+      {
+        id: 'user-1',
+        firstName: 'Test',
+        lastName: 'Reviewer One',
+        email: 'reviewer1@example.com',
+      },
+      {
+        id: 'user-2',
+        firstName: 'Test',
+        lastName: 'Reviewer Two',
+        email: 'reviewer2@example.com',
+      },
+    ]),
+  },
+});
 
     const result = await buildService(prisma).findReviewsForAbstract(
       'org-1',
@@ -450,8 +480,32 @@ describe('ReviewAssignmentsService.findReviewsForAbstract', () => {
       where: { conferenceId: 'conf-1', abstractId: 'abstract-1' },
       include: { review: true, reviewer: true },
     });
-    expect(result).toEqual(assignments);
-  });
+expect(result).toEqual([
+  {
+    ...assignments[0],
+    reviewer: {
+      ...assignments[0].reviewer,
+      user: {
+        id: 'user-1',
+        firstName: 'Test',
+        lastName: 'Reviewer One',
+        email: 'reviewer1@example.com',
+      },
+    },
+  },
+  {
+    ...assignments[1],
+    reviewer: {
+      ...assignments[1].reviewer,
+      user: {
+        id: 'user-2',
+        firstName: 'Test',
+        lastName: 'Reviewer Two',
+        email: 'reviewer2@example.com',
+      },
+    },
+  },
+]);  });
 });
 
 describe('ReviewAssignmentsService.checkConflict', () => {

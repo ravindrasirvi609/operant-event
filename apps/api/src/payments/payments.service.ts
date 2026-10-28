@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { FilesService } from '../files/files.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { isUniqueConstraintViolation } from '../common/utils/prisma-errors.util';
 import { generateQrCode } from '../common/utils/qr-code.util';
@@ -24,12 +25,13 @@ const MAX_QR_CODE_ATTEMPTS = 5;
 @Injectable()
 export class PaymentsService {
   constructor(
-    private readonly prisma: PrismaService,
-    @Inject(PAYMENT_PROVIDERS)
-    private readonly providers: Map<string, PaymentProvider>,
-    private readonly invoicesService: InvoicesService,
-    private readonly eventEmitter: EventEmitter2,
-  ) {}
+  private readonly prisma: PrismaService,
+  @Inject(PAYMENT_PROVIDERS)
+  private readonly providers: Map<string, PaymentProvider>,
+  private readonly invoicesService: InvoicesService,
+  private readonly eventEmitter: EventEmitter2,
+  private readonly filesService: FilesService,
+) {}
 
   /**
    * PAY-002: signature-verified, idempotent. A client-side success
@@ -98,35 +100,148 @@ export class PaymentsService {
   }
 
   /** Registrant-facing: claims a payment was made offline. Does not confirm anything by itself. */
+ 
+
+  /**
+   * Registrant-facing: submits or updates a manual payment claim.
+   * Uploading proof does not automatically confirm payment.
+   */
+  
   async submitManualPaymentProof(
     userId: string,
     orderId: string,
     dto: SubmitManualPaymentProofDto,
   ) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, registration: { userId } },
+      where: {
+        id: orderId,
+        registration: { userId },
+      },
     });
+
     if (!order) {
       throw new NotFoundException('Order not found.');
     }
+
     if (order.status !== 'PENDING') {
       throw new BadRequestException(
         `This order is ${order.status}; no payment proof can be submitted.`,
       );
     }
+    if (dto.proofFileId) {
+  await this.filesService.assertSelfOwnedFile(
+    dto.proofFileId,
+    userId,
+  );
+}
 
-    return this.prisma.payment.create({
-      data: {
+    // Reuse the existing pending manual payment, if present.
+    const existingPayment = await this.prisma.payment.findFirst({
+      where: {
         orderId,
         provider: 'MANUAL',
-        amount: order.total,
-        currency: order.currency,
         status: 'PENDING',
-        reference: dto.reference,
-        proofFileId: dto.proofFileId,
       },
     });
+
+    if (existingPayment) {
+      return this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          reference: dto.reference ?? existingPayment.reference,
+          proofFileId: dto.proofFileId,
+        },
+      });
+    }
+
+    // The partial unique index protects against concurrent submissions.
+    try {
+      return await this.prisma.payment.create({
+        data: {
+          orderId,
+          provider: 'MANUAL',
+          amount: order.total,
+          currency: order.currency,
+          status: 'PENDING',
+          reference: dto.reference,
+          proofFileId: dto.proofFileId,
+        },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) {
+        throw error;
+      }
+
+      // Another request may have created the pending payment first.
+      const racedPayment = await this.prisma.payment.findFirst({
+        where: {
+          orderId,
+          provider: 'MANUAL',
+          status: 'PENDING',
+        },
+      });
+
+      if (!racedPayment) {
+        throw error;
+      }
+
+      return this.prisma.payment.update({
+        where: { id: racedPayment.id },
+        data: {
+          reference: dto.reference ?? racedPayment.reference,
+          proofFileId: dto.proofFileId,
+        },
+      });
+    }
   }
+
+
+async getManualPaymentProof(
+  organizationId: string,
+  orderId: string,
+  paymentId: string,
+) {
+  const payment = await this.prisma.payment.findFirst({
+    where: {
+      id: paymentId,
+      orderId,
+      provider: 'MANUAL',
+      proofFileId: { not: null },
+      order: {
+        conference: {
+          organizationId,
+        },
+      },
+    },
+    select: {
+      id: true,
+      orderId: true,
+      reference: true,
+      proofFileId: true,
+      order: {
+        select: {
+          registration: {
+            select: {
+              userId: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!payment?.proofFileId) {
+    throw new NotFoundException('Payment proof not found.');
+  }
+
+  return {
+    id: payment.id,
+    orderId: payment.orderId,
+    reference: payment.reference,
+    fileId: payment.proofFileId,
+    uploadedBy: payment.order.registration.userId,
+  };
+}
 
   /**
    * Staff-only trusted confirmation for conferences with no payment

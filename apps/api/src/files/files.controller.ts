@@ -1,3 +1,4 @@
+
 import {
   Controller,
   Get,
@@ -21,21 +22,40 @@ import {
 import { CurrentOrganizationId } from '../common/decorators/current-organization.decorator';
 import type { Response } from 'express';
 
+// Maximum upload size: 5 MB
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+interface UploadedFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
 @Controller('files')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: MAX_FILE_SIZE_BYTES,
+      },
+    }),
+  )
   upload(
     @CurrentOrganizationId() organizationId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFile,
   ) {
     if (!file) {
-      throw new NotFoundException('No file was included in the request.');
+      throw new NotFoundException(
+        'No file was included in the request.',
+      );
     }
+
     return this.filesService.upload(organizationId, user.id, {
       fileName: file.originalname,
       mimeType: file.mimetype,
@@ -54,26 +74,64 @@ export class FilesController {
       .then((url) => ({ url }));
   }
 
+
+  @Get(':id/preview')
+  async preview(
+    @CurrentOrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { file, buffer } =
+      await this.filesService.downloadForOrganization(
+        organizationId,
+        id,
+      );
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.mimeType.toLowerCase())) {
+      throw new NotFoundException('Image preview is not available.');
+    }
+
+    response.setHeader('Content-Disposition', 'inline');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'private, no-store');
+
+    return new StreamableFile(buffer, {
+      type: file.mimeType,
+    });
+  }
+
+
   @Get(':id/download')
   async download(
     @CurrentOrganizationId() organizationId: string,
     @Param('id') id: string,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const { file, buffer } = await this.filesService.downloadForOrganization(organizationId, id);
-    response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
-    return new StreamableFile(buffer, { type: file.mimeType });
+    const { file, buffer } =
+      await this.filesService.downloadForOrganization(
+        organizationId,
+        id,
+      );
+
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName}"`,
+    );
+
+    return new StreamableFile(buffer, {
+      type: file.mimeType,
+    });
   }
 }
 
 /**
- * Membership-free path: authors, reviewers, and registrants with no
- * organization membership still need to attach a file. A separate
- * controller class — not a method-level guard override on
- * `FilesController` — because NestJS composes class-level and
- * method-level `@UseGuards` rather than letting a method opt out of a
- * class-level guard; `PermissionsGuard` (and its mandatory
- * `X-Organization-Id` header) must never run on these two routes.
+ * Membership-free file upload/download path.
+ *
+ * Authors, reviewers, and registrants can use this path even when
+ * they do not have an active organization membership.
+ *
+ * These routes require authentication but do not require an
+ * organization membership.
  */
 @Controller('files/self')
 @UseGuards(JwtAuthGuard)
@@ -81,14 +139,23 @@ export class SelfServeFilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: MAX_FILE_SIZE_BYTES,
+      },
+    }),
+  )
   uploadSelf(
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file?: UploadedFile,
   ) {
     if (!file) {
-      throw new NotFoundException('No file was included in the request.');
+      throw new NotFoundException(
+        'No file was included in the request.',
+      );
     }
+
     return this.filesService.uploadSelf(user.id, {
       fileName: file.originalname,
       mimeType: file.mimetype,

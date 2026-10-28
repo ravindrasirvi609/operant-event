@@ -3,34 +3,35 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AsyncBoundary } from '@/components/query/async-boundary';
-import { useMarkNotificationRead, useNotifications } from '@/hooks/use-notifications';
+import { useClearNotifications, useMarkNotificationRead, useNotifications } from '@/hooks/use-notifications';
 import { notificationEntityRoute } from '@/lib/notifications/entity-route';
 import type { Notification } from '@/lib/notifications/types';
 
 export function NotificationList() {
+  const clearNotifications = useClearNotifications();
   const notificationsQuery = useNotifications();
   const markRead = useMarkNotificationRead();
 
   return (
-    <div className="max-w-xl space-y-4">
-      <h1 className="text-xl font-semibold">Notifications</h1>
-      <AsyncBoundary
-        query={notificationsQuery}
-        empty={<p className="text-sm text-muted-foreground">No notifications yet.</p>}
-      >
-        {(notifications) => (
-          <ul className="divide-y rounded-lg border">
-            {notifications.map((notification) => (
-              <NotificationRow
-                key={notification.id}
-                notification={notification}
-                onMarkRead={() => markRead.mutate(notification.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </AsyncBoundary>
-    </div>
+    <div className="flex items-center justify-between gap-3">
+  <h1 className="text-xl font-semibold">Notifications</h1>
+
+  <Button
+    size="sm"
+    variant="outline"
+    disabled={
+      !notificationsQuery.data?.length ||
+      clearNotifications.isPending
+    }
+    onClick={() => {
+      if (window.confirm('Clear all notifications from this list?')) {
+        clearNotifications.mutate();
+      }
+    }}
+  >
+    {clearNotifications.isPending ? 'Clearing...' : 'Clear All'}
+  </Button>
+</div>
   );
 }
 

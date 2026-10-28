@@ -4,6 +4,7 @@ import {
   IsString,
   IsUrl,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateOrganizationDto {
@@ -26,7 +27,10 @@ export class CreateOrganizationDto {
   @IsString()
   contactPhone?: string;
 
-  @IsOptional()
+  @ValidateIf(
+    (_object, value) =>
+      value !== undefined && value !== null && value !== '',
+  )
   @IsUrl()
   website?: string;
 

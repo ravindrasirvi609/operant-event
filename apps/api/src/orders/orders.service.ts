@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ConflictException,
@@ -19,7 +20,13 @@ const MAX_NUMBER_ATTEMPTS = 5;
 export interface CreateOrderResult {
   order: { id: string; orderNumber: string; currency: string };
   checkoutUrl?: string;
-  manualPaymentInstructions?: true;
+  manualPaymentInstructions?: string;
+}
+
+export interface RegistrationOrderResult {
+  order: Awaited<ReturnType<PrismaService['order']['findUnique']>>;
+  paymentMode: 'GATEWAY' | 'MANUAL';
+  manualPaymentInstructions?: string;
 }
 
 @Injectable()
@@ -31,11 +38,8 @@ export class OrdersService {
   ) {}
 
   /**
-   * REG-002/PAY-003: the price is read once, from the already-snapshotted
-   * Registration.totalAmount (itself resolved server-side at registration
-   * time), and frozen again here into OrderItem/Order — nothing here ever
-   * re-derives a price from a RegistrationType that might have changed
-   * since.
+   * Price is taken from the server-calculated Registration.totalAmount
+   * and frozen into Order and OrderItem.
    */
   async create(
     userId: string,
@@ -45,9 +49,11 @@ export class OrdersService {
     const registration = await this.prisma.registration.findFirst({
       where: { id: registrationId, userId },
     });
+
     if (!registration) {
       throw new NotFoundException('Registration not found.');
     }
+
     if (registration.status !== 'PENDING') {
       throw new BadRequestException(
         `This registration is ${registration.status} and cannot be ordered.`,
@@ -57,6 +63,7 @@ export class OrdersService {
     const existingOrder = await this.prisma.order.findUnique({
       where: { registrationId },
     });
+
     if (existingOrder) {
       throw new ConflictException(
         'An order already exists for this registration.',
@@ -66,6 +73,7 @@ export class OrdersService {
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: registration.conferenceId },
     });
+
     const paymentMode = settings?.paymentMode ?? 'MANUAL';
 
     const subtotal = Number(registration.totalAmount);
@@ -87,10 +95,15 @@ export class OrdersService {
     );
 
     if (paymentMode !== 'GATEWAY') {
-      return { order, manualPaymentInstructions: true };
+      return {
+        order,
+        manualPaymentInstructions:
+          settings?.manualPaymentInstructions?.trim() || undefined,
+      };
     }
 
     const provider = this.providers.get(providerName ?? 'razorpay');
+
     if (!provider) {
       throw new BadRequestException(
         `Unknown or unconfigured payment provider "${providerName ?? 'razorpay'}".`,
@@ -115,31 +128,115 @@ export class OrdersService {
       },
     });
 
-    return { order, checkoutUrl: checkout.checkoutUrl };
+    return {
+      order,
+      checkoutUrl: checkout.checkoutUrl,
+    };
   }
 
-  /** Owner-facing read: Order has no userId column, so ownership is checked via the registration relation. */
+  /**
+   * Returns the existing order for a registration.
+   * This prevents the frontend from trying to create a duplicate order.
+   */
+  async findForRegistration(
+    userId: string,
+    registrationId: string,
+  ): Promise<RegistrationOrderResult | null> {
+    const registration = await this.prisma.registration.findFirst({
+      where: {
+        id: registrationId,
+        userId,
+      },
+    });
+
+    if (!registration) {
+      throw new NotFoundException('Registration not found.');
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: {
+        registrationId,
+      },
+      include: {
+        payments: {
+          orderBy: {
+            paidAt: 'desc',
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return null;
+    }
+
+    const hasGatewayPayment = order.payments.some(
+      (payment) => Boolean(payment.providerOrderId),
+    );
+
+    let manualPaymentInstructions: string | undefined;
+
+    if (!hasGatewayPayment) {
+      const settings = await this.prisma.conferenceSetting.findUnique({
+        where: {
+          conferenceId: registration.conferenceId,
+        },
+        select: {
+          manualPaymentInstructions: true,
+        },
+      });
+
+      manualPaymentInstructions =
+        settings?.manualPaymentInstructions?.trim() || undefined;
+    }
+
+    return {
+      order,
+      paymentMode: hasGatewayPayment ? 'GATEWAY' : 'MANUAL',
+      manualPaymentInstructions,
+    };
+  }
+
+  /**
+   * Owner-facing read: ownership is checked through the registration relation.
+   */
   async findOwned(userId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, registration: { userId } },
+      where: {
+        id: orderId,
+        registration: {
+          userId,
+        },
+      },
     });
+
     if (!order) {
       throw new NotFoundException('Order not found.');
     }
+
     return order;
   }
 
   async findForOrganizer(organizationId: string, orderId: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, conference: { organizationId } },
+      where: {
+        id: orderId,
+        conference: {
+          organizationId,
+        },
+      },
     });
+
     if (!order) {
       throw new NotFoundException('Order not found.');
     }
+
     return order;
   }
 
-  /** Fixes the real gap behind `<PendingPaymentsQueue>`: lists orders for a conference, optionally by status. */
+  /**
+   * Lists orders for a conference, optionally filtered by status.
+   */
   async findAllForOrganizer(
     organizationId: string,
     conferenceId: string,
@@ -148,10 +245,14 @@ export class OrdersService {
     return this.prisma.order.findMany({
       where: {
         conferenceId,
-        conference: { organizationId },
+        conference: {
+          organizationId,
+        },
         ...(status !== undefined && { status }),
       },
-      include: { payments: true },
+      include: {
+        payments: true,
+      },
     });
   }
 
@@ -168,10 +269,13 @@ export class OrdersService {
     },
   ) {
     let sequence =
-      (await this.prisma.order.count({ where: { conferenceId } })) + 1;
+      (await this.prisma.order.count({
+        where: { conferenceId },
+      })) + 1;
 
     for (let attempt = 0; attempt < MAX_NUMBER_ATTEMPTS; attempt++) {
       const orderNumber = formatSequenceNumber('ORD', sequence);
+
       try {
         return await this.prisma.order.create({
           data: {
@@ -203,6 +307,7 @@ export class OrdersService {
           sequence += 1;
           continue;
         }
+
         throw error;
       }
     }

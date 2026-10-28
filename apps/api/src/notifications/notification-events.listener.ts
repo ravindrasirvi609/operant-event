@@ -56,6 +56,16 @@ export class NotificationEventsListener {
     return this.handle(NOTIFICATION_EVENTS.CERTIFICATE_ISSUED, payload);
   }
 
+@OnEvent(NOTIFICATION_EVENTS.CONFERENCE_FEEDBACK_SUBMITTED)
+onConferenceFeedbackSubmitted(
+  payload: NotificationEventPayload,
+): Promise<void> {
+  return this.handle(
+    NOTIFICATION_EVENTS.CONFERENCE_FEEDBACK_SUBMITTED,
+    payload,
+  );
+}
+
   @OnEvent(NOTIFICATION_EVENTS.CONFERENCE_REMINDER)
   onConferenceReminder(payload: NotificationEventPayload): Promise<void> {
     return this.handle(NOTIFICATION_EVENTS.CONFERENCE_REMINDER, payload);

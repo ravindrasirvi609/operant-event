@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useAllOrganizations, useUpdateOrganizationStatus } from '@/hooks/use-organizations';
 import type { OrganizationWithMemberCount } from '@/lib/organizations/types';
+import { useActiveOrganization } from '@/hooks/use-active-organization';
 
 function StatusBadge({ status }: { status: OrganizationWithMemberCount['status'] }) {
   if (status === 'ACTIVE') return <Badge>Active</Badge>;
@@ -20,6 +21,7 @@ function StatusBadge({ status }: { status: OrganizationWithMemberCount['status']
 
 function OrganizationsTable({ organizations }: { organizations: OrganizationWithMemberCount[] }) {
   const updateStatus = useUpdateOrganizationStatus();
+  const { setActiveOrganization } = useActiveOrganization();
   const [suspendTarget, setSuspendTarget] = useState<OrganizationWithMemberCount | null>(null);
 
   function activate(organizationId: string) {
@@ -50,7 +52,15 @@ function OrganizationsTable({ organizations }: { organizations: OrganizationWith
         <tbody>
           {organizations.map((org) => (
             <tr key={org.id} className="border-t">
-              <td className="py-2 font-medium">{org.name}</td>
+              <td className="py-2 font-medium">
+  <Link
+  href={`/organizations/${org.id}/settings`}
+  onClick={() => setActiveOrganization(org.id)}
+  className="underline-offset-4 hover:underline focus-visible:underline"
+>
+  {org.name}
+</Link>
+</td>
               <td className="py-2 font-mono text-xs text-muted-foreground">{org.slug}</td>
               <td className="py-2">
                 <StatusBadge status={org.status} />

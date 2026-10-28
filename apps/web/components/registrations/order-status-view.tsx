@@ -38,8 +38,26 @@ export function OrderStatusView({ orderId }: { orderId: string }) {
           <p className="text-sm">
             Total: {order.total} {order.currency}
           </p>
-          <AsyncBoundary query={invoiceQuery}>{(invoice) => <InvoiceView invoice={invoice ?? null} />}</AsyncBoundary>
-        </div>
+{invoiceQuery.isPending ? (
+  <p className="text-sm text-muted-foreground">
+    Checking invoice availability…
+  </p>
+) : invoiceQuery.isError ? (
+  <div className="rounded-lg border p-3 text-sm">
+    <p className="text-muted-foreground">
+      Invoice is not available right now. Your order status is shown above.
+    </p>
+    <button
+      type="button"
+      className="mt-2 underline"
+      onClick={() => invoiceQuery.refetch()}
+    >
+      Retry invoice
+    </button>
+  </div>
+) : (
+  <InvoiceView invoice={invoiceQuery.data ?? null} />
+)}        </div>
       )}
     </AsyncBoundary>
   );

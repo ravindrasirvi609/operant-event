@@ -1,4 +1,11 @@
-import { IsDateString, IsOptional, IsString, MinLength } from 'class-validator';
+
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class UpdateSessionDto {
   @IsOptional()
@@ -16,6 +23,9 @@ export class UpdateSessionDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/\S/, {
+    message: 'Room is required and cannot be blank.',
+  })
   room?: string;
 
   @IsOptional()

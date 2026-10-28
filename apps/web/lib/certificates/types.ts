@@ -23,14 +23,27 @@ export interface Certificate {
   status: CertificateStatus;
 }
 
+
+export interface MyCertificate extends Certificate {
+  conference: {
+    name: string;
+  };
+}
+
 export interface CertificateWithRegistration extends Certificate {
   registration: {
     id: string;
     registrationNumber: string;
     userId: string;
     status: string;
+    user?: {
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+    };
   };
 }
+
 
 /**
  * `GET certificates/verify/:code` (public) — this exact 6-field shape

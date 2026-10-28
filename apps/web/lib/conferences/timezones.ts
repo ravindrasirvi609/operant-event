@@ -21,10 +21,22 @@ const FALLBACK_TIMEZONES = [
   'Pacific/Auckland',
 ];
 
-/** Full IANA list where the runtime supports it (Node 18+, modern browsers); a curated fallback otherwise. */
+/**
+ * Returns the IANA timezone list supported by the current runtime.
+ *
+ * Some runtimes expose only canonical timezone identifiers through
+ * Intl.supportedValuesOf('timeZone') and may omit valid IANA aliases
+ * such as Asia/Kolkata. The curated list is therefore merged in so
+ * important supported timezones are always available.
+ */
 export function listTimezones(): string[] {
   if (typeof Intl.supportedValuesOf === 'function') {
-    return Intl.supportedValuesOf('timeZone');
+    const supportedTimezones = Intl.supportedValuesOf('timeZone');
+
+    return Array.from(
+      new Set([...supportedTimezones, ...FALLBACK_TIMEZONES]),
+    ).sort();
   }
+
   return FALLBACK_TIMEZONES;
 }

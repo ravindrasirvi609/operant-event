@@ -16,19 +16,36 @@ const MAX_NUMBER_ATTEMPTS = 5;
 export class RegistrationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Takes a category, not a specific pricing window id: the effective
-   * window for "now" is resolved server-side (REG-002), so a stale
-   * frontend showing an expired Early Bird price can never be submitted
-   * against.
-   */
-  async register(conferenceId: string, userId: string, categoryId: string) {
+  async register(
+    conferenceId: string,
+    userId: string,
+    categoryId: string,
+  ) {
     const category = await this.prisma.registrationCategory.findFirst({
       where: { id: categoryId, conferenceId },
       include: { types: true },
     });
+
     if (!category) {
       throw new NotFoundException('Registration category not found.');
+    }
+
+    // Reuse an existing active registration for this user and category.
+    // This prevents a new REG number every time Register is clicked.
+    const existingRegistration = await this.prisma.registration.findFirst({
+      where: {
+        conferenceId,
+        userId,
+        status: { notIn: [...NON_ACTIVE_STATUSES] },
+        registrationType: {
+          is: { categoryId },
+        },
+      },
+      orderBy: { registeredAt: 'desc' },
+    });
+
+    if (existingRegistration) {
+      return existingRegistration;
     }
 
     const effective = resolveEffectivePricingWindow(
@@ -40,42 +57,70 @@ export class RegistrationsService {
       })),
       new Date(),
     );
+
     if (!effective) {
       throw new BadRequestException(
         'No pricing window is currently active for this category.',
       );
     }
+
     const registrationType = category.types.find(
       (type) => type.id === effective.id,
     );
+
     if (!registrationType) {
       throw new BadRequestException(
         'No pricing window is currently active for this category.',
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      if (registrationType.capacity !== null) {
-        const activeCount = await tx.registration.count({
-          where: {
-            registrationTypeId: registrationType.id,
-            status: { notIn: [...NON_ACTIVE_STATUSES] },
-          },
-        });
-        if (activeCount >= registrationType.capacity) {
-          throw new ConflictException(
-            'This registration category is at capacity.',
+    for (let attempt = 0; attempt < MAX_NUMBER_ATTEMPTS; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          // Recheck inside the transaction in case another request
+          // created the registration after the first lookup.
+          const existing = await tx.registration.findFirst({
+            where: {
+              conferenceId,
+              userId,
+              status: { notIn: [...NON_ACTIVE_STATUSES] },
+              registrationType: {
+                is: { categoryId },
+              },
+            },
+            orderBy: { registeredAt: 'desc' },
+          });
+
+          if (existing) {
+            return existing;
+          }
+
+          if (registrationType.capacity !== null) {
+            const activeCount = await tx.registration.count({
+              where: {
+                registrationTypeId: registrationType.id,
+                status: { notIn: [...NON_ACTIVE_STATUSES] },
+              },
+            });
+
+            if (activeCount >= registrationType.capacity) {
+              throw new ConflictException(
+                'This registration category is at capacity.',
+              );
+            }
+          }
+
+          const existingCount = await tx.registration.count({
+            where: { conferenceId },
+          });
+
+          const sequence = existingCount + attempt + 1;
+          const registrationNumber = formatSequenceNumber(
+            'REG',
+            sequence,
           );
-        }
-      }
 
-      let sequence =
-        (await tx.registration.count({ where: { conferenceId } })) + 1;
-
-      for (let attempt = 0; attempt < MAX_NUMBER_ATTEMPTS; attempt++) {
-        const registrationNumber = formatSequenceNumber('REG', sequence);
-        try {
-          return await tx.registration.create({
+          return tx.registration.create({
             data: {
               conferenceId,
               registrationNumber,
@@ -86,28 +131,31 @@ export class RegistrationsService {
               currency: registrationType.currency,
             },
           });
-        } catch (error) {
-          if (isUniqueConstraintViolation(error)) {
-            sequence += 1;
-            continue;
-          }
-          throw error;
+        });
+      } catch (error) {
+        if (isUniqueConstraintViolation(error)) {
+          // Retry registration-number conflicts in a fresh transaction.
+          continue;
         }
-      }
 
-      throw new ConflictException(
-        'Could not assign a unique registration number; please retry.',
-      );
-    });
+        throw error;
+      }
+    }
+
+    throw new ConflictException(
+      'Could not assign a unique registration number; please retry.',
+    );
   }
 
   async findOwned(userId: string, registrationId: string) {
     const registration = await this.prisma.registration.findFirst({
       where: { id: registrationId, userId },
     });
+
     if (!registration) {
       throw new NotFoundException('Registration not found.');
     }
+
     return registration;
   }
 }

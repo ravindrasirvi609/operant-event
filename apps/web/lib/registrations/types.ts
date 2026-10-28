@@ -98,6 +98,12 @@ export interface Invoice {
  * never neither. Consumers must branch on which key is present here, not
  * on a separately-fetched `ConferenceSetting.paymentMode`.
  */
-export type CreateOrderResult =
-  | { order: Order; checkoutUrl: string }
-  | { order: Order; manualPaymentInstructions: true };
+export interface CreateOrderResult {
+  order: {
+    id: string;
+    orderNumber: string;
+    currency: string;
+  };
+  checkoutUrl?: string;
+  manualPaymentInstructions?: string;
+}

@@ -2,9 +2,12 @@ import {
   IsBoolean,
   IsDateString,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
+
+
 
 export class UpdateConferenceSettingsDto {
   @IsOptional()
@@ -54,4 +57,11 @@ export class UpdateConferenceSettingsDto {
   @IsOptional()
   @IsBoolean()
   checkinEnabled?: boolean;
+
+    @IsOptional()
+  @IsObject()
+  certificateTemplateFieldPositions?: Record<
+    string,
+    { x: number; y: number }
+  >;
 }

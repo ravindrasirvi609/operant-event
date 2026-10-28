@@ -34,12 +34,38 @@ export type ReviewMode = (typeof REVIEW_MODES)[number];
 export const PAYMENT_MODES = ['GATEWAY', 'MANUAL'] as const;
 export type PaymentMode = (typeof PAYMENT_MODES)[number];
 
+
+export const CERTIFICATE_TEMPLATE_FIELDS = [
+  'participantName',
+  'conferenceName',
+  'date',
+  'certificateNumber',
+  'qrCode',
+] as const;
+
+export type CertificateTemplateField =
+  (typeof CERTIFICATE_TEMPLATE_FIELDS)[number];
+
+export interface CertificateTemplateFieldPosition {
+  x: number;
+  y: number;
+}
+
+export type CertificateTemplateFieldPositions = Partial<
+  Record<CertificateTemplateField, CertificateTemplateFieldPosition>
+>;
+
+
 export interface ConferenceSetting {
   conferenceId: string;
   abstractEnabled: boolean;
   abstractStartDate: string | null;
   abstractEndDate: string | null;
   reviewEnabled: boolean;
+  certificateTemplateFileId: string | null;
+  certificateTemplateMimeType: string | null;
+  certificateTemplateUpdatedAt: string | null;
+  certificateTemplateFieldPositions: CertificateTemplateFieldPositions | null;
   reviewMode: ReviewMode;
   registrationEnabled: boolean;
   registrationStartDate: string | null;

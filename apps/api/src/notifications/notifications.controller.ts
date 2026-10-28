@@ -16,6 +16,11 @@ export class NotificationsController {
     return this.notificationsService.findMine(user.id);
   }
 
+    @Patch('my/clear')
+clearMine(@CurrentUser() user: AuthenticatedUser) {
+  return this.notificationsService.clearMine(user.id);
+}
+
   @Patch(':id/read')
   markRead(
     @CurrentUser() user: AuthenticatedUser,

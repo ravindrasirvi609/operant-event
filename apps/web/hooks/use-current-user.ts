@@ -9,9 +9,17 @@ export interface CurrentUser {
   email: string;
   firstName: string;
   lastName: string;
-  /** True only for the platform Super Admin account(s). Org-level roles are
-   *  tracked separately via OrganizationMembership. */
+
+  /**
+   * True only for the platform Super Admin account(s).
+   * Org-level roles are tracked separately via OrganizationMembership.
+   */
   isSuperAdmin: boolean;
+
+  /**
+   * True when the authenticated user has an active Reviewer record.
+   */
+  isReviewer: boolean;
 }
 
 export const CURRENT_USER_QUERY_KEY = ['currentUser'];
@@ -19,9 +27,8 @@ export const CURRENT_USER_QUERY_KEY = ['currentUser'];
 /**
  * Fetches the authenticated user's profile from the backend.
  *
- * The `isSuperAdmin` field is used to conditionally show platform-admin UI
- * (e.g. the "Create an organization" flow, which only Super Admins may access).
- * Cached for 5 minutes — re-fetched on window focus by TanStack Query's default.
+ * The `isSuperAdmin` field is used to conditionally show platform-admin UI.
+ * The `isReviewer` field is used to route reviewers to the Reviewer Portal.
  */
 export function useCurrentUser() {
   return useQuery({

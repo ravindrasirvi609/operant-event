@@ -7,6 +7,7 @@ export const NOTIFICATION_EVENTS = {
   ABSTRACT_ACCEPTED: 'abstract.accepted',
   PAYMENT_SUCCEEDED: 'payment.succeeded',
   CERTIFICATE_ISSUED: 'certificate.issued',
+  CONFERENCE_FEEDBACK_SUBMITTED: 'conference.feedback_submitted',
   CONFERENCE_REMINDER: 'conference.reminder',
 } as const;
 

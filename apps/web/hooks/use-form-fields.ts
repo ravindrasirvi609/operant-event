@@ -1,19 +1,53 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPatch, apiPost } from '@/lib/api/client';
-import type { ConferenceFormField } from '@/lib/conferences/form-field.types';
-import type { FormFieldStatus, FormFieldType } from '@/lib/conferences/form-field-types';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
-function formFieldsQueryKey(conferenceId: string) {
-  return ['conferences', conferenceId, 'form-fields'];
+import {
+  apiGet,
+  apiPatch,
+  apiPost,
+} from '@/lib/api/client';
+
+import type { ConferenceFormField } from '@/lib/conferences/form-field.types';
+
+import type {
+  FormFieldStatus,
+  FormFieldType,
+} from '@/lib/conferences/form-field-types';
+
+function formFieldsQueryKey(
+  conferenceId: string,
+) {
+  return [
+    'conferences',
+    conferenceId,
+    'form-fields',
+  ];
 }
 
-export function useFormFields(conferenceId: string) {
+/**
+ * Get all form fields for the admin Form Builder.
+ *
+ * Includes both ACTIVE and DISABLED fields.
+ */
+export function useFormFields(
+  conferenceId: string,
+) {
   return useQuery({
-    queryKey: formFieldsQueryKey(conferenceId),
-    queryFn: () => apiGet<ConferenceFormField[]>(`conferences/${conferenceId}/form-fields`),
-    enabled: Boolean(conferenceId),
+    queryKey:
+      formFieldsQueryKey(conferenceId),
+
+    queryFn: () =>
+      apiGet<ConferenceFormField[]>(
+        `conferences/${conferenceId}/form-fields`,
+      ),
+
+    enabled:
+      Boolean(conferenceId),
   });
 }
 
@@ -26,32 +60,67 @@ export interface CreateFormFieldInput {
   optionsJson?: string[];
 }
 
-export function useCreateFormField(conferenceId: string) {
-  const queryClient = useQueryClient();
+export function useCreateFormField(
+  conferenceId: string,
+) {
+  const queryClient =
+    useQueryClient();
+
   return useMutation({
-    mutationFn: (input: CreateFormFieldInput) =>
-      apiPost<ConferenceFormField>(`conferences/${conferenceId}/form-fields`, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: formFieldsQueryKey(conferenceId) });
+    mutationFn: (
+      input: CreateFormFieldInput,
+    ) =>
+      apiPost<ConferenceFormField>(
+        `conferences/${conferenceId}/form-fields`,
+        input,
+      ),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey:
+          formFieldsQueryKey(conferenceId),
+      });
     },
   });
 }
 
 export interface UpdateFormFieldInput {
   label?: string;
+  fieldType?: FormFieldType;
   isRequired?: boolean;
   optionsJson?: string[];
   sortOrder?: number;
   status?: FormFieldStatus;
 }
 
-export function useUpdateFormField(conferenceId: string) {
-  const queryClient = useQueryClient();
+export function useUpdateFormField(
+  conferenceId: string,
+) {
+  const queryClient =
+    useQueryClient();
+
   return useMutation({
-    mutationFn: ({ fieldId, input }: { fieldId: string; input: UpdateFormFieldInput }) =>
-      apiPatch<ConferenceFormField>(`conferences/${conferenceId}/form-fields/${fieldId}`, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: formFieldsQueryKey(conferenceId) });
+    mutationFn: ({
+      fieldId,
+      input,
+    }: {
+      fieldId: string;
+      input: UpdateFormFieldInput;
+    }) =>
+      apiPatch<ConferenceFormField>(
+        `conferences/${conferenceId}/form-fields/${fieldId}`,
+        input,
+      ),
+
+    onSuccess: async () => {
+      /*
+       * Wait for React Query to invalidate/refetch
+       * before the edit operation is considered complete.
+       */
+      await queryClient.invalidateQueries({
+        queryKey:
+          formFieldsQueryKey(conferenceId),
+      });
     },
   });
 }

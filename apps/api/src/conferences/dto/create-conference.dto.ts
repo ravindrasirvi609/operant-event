@@ -5,6 +5,7 @@ import {
   IsString,
   IsUrl,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateConferenceDto {
@@ -50,6 +51,7 @@ export class CreateConferenceDto {
   @IsString()
   country?: string;
 
+  @ValidateIf((object, value) => value !== '')
   @IsOptional()
   @IsUrl()
   website?: string;

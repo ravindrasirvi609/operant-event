@@ -9,7 +9,8 @@ export type FormFieldTypeName =
   | 'RADIO'
   | 'CHECKBOX'
   | 'FILE'
-  | 'URL';
+  | 'URL'
+  | 'AUTHOR_BLOCK';
 
 export interface FormFieldDefinition {
   fieldKey: string;
@@ -26,9 +27,13 @@ export interface ValidateAbstractFormOptions {
 
 /**
  * ABS-002/ABS-005: validates submitted form data against the conference's
- * currently active field set. Pass requireRequiredFields: false for a draft
- * save (ABS-001 — "draft can be saved without completing required fields")
- * and true (the default) when actually submitting.
+ * currently active field set.
+ *
+ * AUTHOR_BLOCK is handled separately by AbstractsService because authors
+ * are stored in the AbstractAuthor table rather than inside formData.
+ *
+ * Pass requireRequiredFields: false for a draft save
+ * and true when actually submitting.
  */
 export function validateAbstractFormData(
   fields: FormFieldDefinition[],
@@ -36,8 +41,14 @@ export function validateAbstractFormData(
   options: ValidateAbstractFormOptions = { requireRequiredFields: true },
 ): string[] {
   const errors: string[] = [];
-  const activeFields = fields.filter((field) => field.status === 'ACTIVE');
-  const activeKeys = new Set(activeFields.map((field) => field.fieldKey));
+
+  const activeFields = fields.filter(
+    (field) => field.status === 'ACTIVE',
+  );
+
+  const activeKeys = new Set(
+    activeFields.map((field) => field.fieldKey),
+  );
 
   for (const key of Object.keys(formData)) {
     if (!activeKeys.has(key)) {
@@ -48,17 +59,37 @@ export function validateAbstractFormData(
   }
 
   for (const field of activeFields) {
+    /*
+     * AUTHOR_BLOCK is not stored in formData.
+     *
+     * Authors are saved separately through the AbstractAuthor relation.
+     * Therefore required/empty validation for AUTHOR_BLOCK is handled by
+     * AbstractsService during final submission.
+     */
+    if (field.fieldType === 'AUTHOR_BLOCK') {
+      continue;
+    }
+
     const value = formData[field.fieldKey];
-    const isPresent = value !== undefined && value !== null && value !== '';
+
+    const isPresent =
+      value !== undefined &&
+      value !== null &&
+      value !== '';
 
     if (!isPresent) {
-      if (field.isRequired && options.requireRequiredFields) {
+      if (
+        field.isRequired &&
+        options.requireRequiredFields
+      ) {
         errors.push(`"${field.label}" is required.`);
       }
+
       continue;
     }
 
     const typeError = validateFieldType(field, value);
+
     if (typeError) {
       errors.push(typeError);
     }
@@ -80,12 +111,14 @@ function validateFieldType(
         : `"${field.label}" must be text.`;
 
     case 'NUMBER':
-      return typeof value === 'number' && !Number.isNaN(value)
+      return typeof value === 'number' &&
+        !Number.isNaN(value)
         ? null
         : `"${field.label}" must be a number.`;
 
     case 'DATE':
-      return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+      return typeof value === 'string' &&
+        !Number.isNaN(Date.parse(value))
         ? null
         : `"${field.label}" must be a valid date.`;
 
@@ -95,11 +128,16 @@ function validateFieldType(
         : `"${field.label}" must be true or false.`;
 
     case 'URL':
-      return isValidUrl(value) ? null : `"${field.label}" must be a valid URL.`;
+      return isValidUrl(value)
+        ? null
+        : `"${field.label}" must be a valid URL.`;
 
     case 'SELECT':
     case 'RADIO': {
-      const options = toOptionValues(field.optionsJson);
+      const options = toOptionValues(
+        field.optionsJson,
+      );
+
       return options.includes(value as string)
         ? null
         : `"${field.label}" must be one of: ${options.join(', ')}.`;
@@ -109,11 +147,18 @@ function validateFieldType(
       if (!Array.isArray(value)) {
         return `"${field.label}" must be a list of values.`;
       }
-      const options = toOptionValues(field.optionsJson);
-      const values: unknown[] = value;
-      const invalid = values.filter(
-        (entry) => !options.includes(entry as string),
+
+      const options = toOptionValues(
+        field.optionsJson,
       );
+
+      const values: unknown[] = value;
+
+      const invalid = values.filter(
+        (entry) =>
+          !options.includes(entry as string),
+      );
+
       return invalid.length === 0
         ? null
         : `"${field.label}" contains invalid selection(s): ${invalid.join(', ')}.`;
@@ -124,19 +169,33 @@ function validateFieldType(
         ? null
         : `"${field.label}" must reference an uploaded file.`;
 
+    case 'AUTHOR_BLOCK':
+      /*
+       * AUTHOR_BLOCK is validated through AbstractAuthor
+       * records in AbstractsService, not through formData.
+       */
+      return null;
+
     default:
       return null;
   }
 }
 
-function toOptionValues(optionsJson: unknown): string[] {
-  return Array.isArray(optionsJson) ? (optionsJson as string[]) : [];
+function toOptionValues(
+  optionsJson: unknown,
+): string[] {
+  return Array.isArray(optionsJson)
+    ? (optionsJson as string[])
+    : [];
 }
 
-function isValidUrl(value: unknown): boolean {
+function isValidUrl(
+  value: unknown,
+): boolean {
   if (typeof value !== 'string') {
     return false;
   }
+
   try {
     new URL(value);
     return true;

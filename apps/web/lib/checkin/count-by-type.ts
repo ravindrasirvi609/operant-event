@@ -1,10 +1,33 @@
-import { CHECKIN_TYPES, type CheckinType, type CheckinWithRegistration } from './types';
 
-/** The backend returns only a flat list, no aggregate counts — this derives per-type totals client-side. */
-export function countByType(checkins: CheckinWithRegistration[]): Record<CheckinType, number> {
-  const counts = Object.fromEntries(CHECKIN_TYPES.map((type) => [type, 0])) as Record<CheckinType, number>;
-  for (const checkin of checkins) {
-    counts[checkin.checkinType] += 1;
+import {
+  CHECKIN_TYPES,
+  type CheckinType,
+  type CheckinWithRegistration,
+} from './types';
+
+/**
+ * Count unique delegates for each check-in type.
+ * Repeated historical scans won't inflate the dashboard totals.
+ */
+export function countByType(
+  checkins: CheckinWithRegistration[],
+): Record<CheckinType, number> {
+  const registrationsByType = new Map<CheckinType, Set<string>>();
+
+  for (const type of CHECKIN_TYPES) {
+    registrationsByType.set(type, new Set<string>());
   }
-  return counts;
+
+  for (const checkin of checkins) {
+    registrationsByType
+      .get(checkin.checkinType)
+      ?.add(checkin.registrationId);
+  }
+
+  return Object.fromEntries(
+    CHECKIN_TYPES.map((type) => [
+      type,
+      registrationsByType.get(type)?.size ?? 0,
+    ]),
+  ) as Record<CheckinType, number>;
 }

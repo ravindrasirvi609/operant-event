@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ConflictException,
@@ -23,6 +24,7 @@ const CERTIFICATE_TYPES = [
   'CHAIR',
   'WORKSHOP',
 ];
+
 const MAX_NUMBER_ATTEMPTS = 5;
 
 @Injectable()
@@ -34,21 +36,103 @@ export class CertificatesService {
     private readonly filesService: FilesService,
   ) {}
 
+
+async downloadOwnedCertificate(userId: string, certificateId: string) {
+  const certificate = await this.prisma.certificate.findFirst({
+    where: {
+      id: certificateId,
+      registration: { userId },
+    },
+    select: {
+      status: true,
+      fileId: true,
+      conferenceId: true,
+      conference: {
+        select: {
+          organizationId: true,
+        },
+      },
+    },
+  });
+
+  if (
+    !certificate ||
+    certificate.status !== 'ISSUED' ||
+    !certificate.fileId
+  ) {
+    throw new NotFoundException('Certificate not available.');
+  }
+
+  const feedback = await this.prisma.conferenceFeedback.findUnique({
+    where: {
+      conferenceId_userId: {
+        conferenceId: certificate.conferenceId,
+        userId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!feedback) {
+    throw new BadRequestException(
+      'Please submit conference feedback before downloading your certificate.',
+    );
+  }
+
+  return this.filesService.downloadForOrganization(
+    certificate.conference.organizationId,
+    certificate.fileId,
+  );
+}
+
+
   /**
-   * SRS §18: evaluates every registration against every certificate type
-   * and writes ELIGIBLE rows for the ones that qualify. Idempotent and
-   * re-runnable — a registration/type pair that already has a Certificate
-   * row (any status) is left untouched. The follow-up PDF-rendering step
-   * (ELIGIBLE -> GENERATED -> ISSUED) is deferred; `issue()` below covers
-   * the final ISSUED transition without a rendered file, matching the
-   * Invoice PDF deferral from Phase 4.
+   * Returns certificates for a conference owned by the organization.
    */
-  async generateForConference(organizationId: string, conferenceId: string) {
-    await this.assertConferenceInOrganization(organizationId, conferenceId);
+  async findAllForConference(
+    organizationId: string,
+    conferenceId: string,
+  ) {
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
+
+    return this.prisma.certificate.findMany({
+      where: { conferenceId },
+      include: {
+        registration: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Creates ELIGIBLE certificate records for registrations that qualify.
+   */
+  async generateForConference(
+    organizationId: string,
+    conferenceId: string,
+  ) {
+    await this.assertConferenceInOrganization(
+      organizationId,
+      conferenceId,
+    );
 
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId },
     });
+
     if (!settings?.certificateEnabled) {
       throw new BadRequestException(
         'Certificates are not enabled for this conference.',
@@ -58,6 +142,7 @@ export class CertificatesService {
     const registrations = await this.prisma.registration.findMany({
       where: { conferenceId },
     });
+
     const created: Certificate[] = [];
 
     for (const registration of registrations) {
@@ -70,6 +155,7 @@ export class CertificatesService {
             },
           },
         });
+
         if (existing) {
           continue;
         }
@@ -78,6 +164,7 @@ export class CertificatesService {
           certificateType,
           registration.id,
         );
+
         if (!eligible) {
           continue;
         }
@@ -95,31 +182,72 @@ export class CertificatesService {
     return created;
   }
 
+  /**
+   * Issues a certificate and stores its PDF.
+   */
   async issue(organizationId: string, certificateId: string) {
     const certificate = await this.assertCertificateInOrganization(
       organizationId,
       certificateId,
     );
+
     if (certificate.status === 'ISSUED') {
       return certificate;
+    }
+
+    if (certificate.status === 'REVOKED') {
+      throw new BadRequestException(
+        'A revoked certificate cannot be issued again.',
+      );
     }
 
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: certificate.conferenceId },
     });
+
     const holderName = this.resolveHolderName(
       settings?.certificateShowFullName ?? true,
       certificate.registration.user.firstName,
       certificate.registration.user.lastName,
     );
 
+    const template = settings?.certificateTemplateFileId
+      ? await this.filesService.downloadForOrganization(
+          certificate.conference.organizationId,
+          settings.certificateTemplateFileId,
+        )
+      : null;
+
+    const templateMimeType = template?.file.mimeType;
+
+    if (
+      templateMimeType &&
+      !['image/png', 'application/pdf'].includes(templateMimeType)
+    ) {
+      throw new BadRequestException(
+        'Unsupported certificate template MIME type. Use PNG or PDF.',
+      );
+    }
+
+    const fieldPositions = settings?.certificateTemplateFieldPositions
+      ? (settings.certificateTemplateFieldPositions as Record<
+          string,
+          { x: number; y: number }
+        >)
+      : undefined;
+
+    const issuedAt = new Date();
+
     const buffer = await renderCertificatePdf({
       certificateNumber: certificate.certificateNumber,
       certificateType: certificate.certificateType,
       holderName,
       conferenceName: certificate.conference.name,
-      issuedAt: new Date(),
+      issuedAt,
       verificationCode: certificate.verificationCode,
+      templateBuffer: template?.buffer,
+      templateMimeType,
+      fieldPositions,
     });
 
     const file = await this.filesService.upload(
@@ -135,60 +263,319 @@ export class CertificatesService {
 
     const updated = await this.prisma.certificate.update({
       where: { id: certificateId },
-      data: { status: 'ISSUED', issuedAt: new Date(), fileId: file.id },
+      data: {
+        status: 'ISSUED',
+        issuedAt,
+        fileId: file.id,
+      },
     });
 
-    this.eventEmitter.emit(NOTIFICATION_EVENTS.CERTIFICATE_ISSUED, {
-      organizationId,
-      conferenceId: certificate.conferenceId,
-      userId: certificate.registration.userId,
-      templateData: {
-        certificateType: certificate.certificateType,
-        certificateNumber: updated.certificateNumber,
+    this.eventEmitter.emit(
+      NOTIFICATION_EVENTS.CERTIFICATE_ISSUED,
+      {
+        organizationId,
+        conferenceId: certificate.conferenceId,
+        userId: certificate.registration.userId,
+        templateData: {
+          certificateType: certificate.certificateType,
+          certificateNumber: updated.certificateNumber,
+        },
+        entityType: 'certificate',
+        entityId: certificateId,
       },
-      entityType: 'certificate',
-      entityId: certificateId,
-    });
+    );
 
     return updated;
   }
 
+
+  /**
+   * Regenerates the PDF for an already-issued certificate using
+   * the conference's latest saved template.
+   *
+   * Certificate number, verification code and issue date are preserved.
+   */
+  async regenerateIssuedCertificatePdf(
+    organizationId: string,
+    certificateId: string,
+  ) {
+    const certificate = await this.assertCertificateInOrganization(
+      organizationId,
+      certificateId,
+    );
+
+    if (certificate.status !== 'ISSUED') {
+      throw new BadRequestException(
+        'Only an ISSUED certificate PDF can be regenerated.',
+      );
+    }
+
+    const settings = await this.prisma.conferenceSetting.findUnique({
+      where: { conferenceId: certificate.conferenceId },
+    });
+
+    const holderName = this.resolveHolderName(
+      settings?.certificateShowFullName ?? true,
+      certificate.registration.user.firstName,
+      certificate.registration.user.lastName,
+    );
+
+    const template = settings?.certificateTemplateFileId
+      ? await this.filesService.downloadForOrganization(
+          certificate.conference.organizationId,
+          settings.certificateTemplateFileId,
+        )
+      : null;
+
+    const templateMimeType = template?.file.mimeType;
+
+    if (
+      templateMimeType &&
+      !['image/png', 'application/pdf'].includes(templateMimeType)
+    ) {
+      throw new BadRequestException(
+        'Unsupported certificate template MIME type. Use PNG or PDF.',
+      );
+    }
+
+    const fieldPositions = settings?.certificateTemplateFieldPositions
+      ? (settings.certificateTemplateFieldPositions as Record<
+          string,
+          { x: number; y: number }
+        >)
+      : undefined;
+
+    const issuedAt = certificate.issuedAt ?? new Date();
+
+    const buffer = await renderCertificatePdf({
+      certificateNumber: certificate.certificateNumber,
+      certificateType: certificate.certificateType,
+      holderName,
+      conferenceName: certificate.conference.name,
+      issuedAt,
+      verificationCode: certificate.verificationCode,
+      templateBuffer: template?.buffer,
+      templateMimeType,
+      fieldPositions,
+    });
+
+    const file = await this.filesService.upload(
+      certificate.conference.organizationId,
+      certificate.registration.userId,
+      {
+        fileName: `${certificate.certificateNumber}.pdf`,
+        mimeType: 'application/pdf',
+        size: buffer.length,
+        buffer,
+      },
+    );
+
+    // Update only the PDF file reference. Preserve issuance metadata.
+    return this.prisma.certificate.update({
+      where: { id: certificateId },
+      data: {
+        fileId: file.id,
+      },
+    });
+  }
+
+
+  /**
+   * Revokes an issued certificate.
+   */
   async revoke(organizationId: string, certificateId: string) {
     const certificate = await this.assertCertificateInOrganization(
       organizationId,
       certificateId,
     );
+
     if (certificate.status !== 'ISSUED') {
       throw new BadRequestException(
         'Only an ISSUED certificate can be revoked.',
       );
     }
+
     return this.prisma.certificate.update({
       where: { id: certificateId },
       data: { status: 'REVOKED' },
     });
   }
 
+  /**
+   * Finds a certificate belonging to the specified user.
+   */
   async findOwned(userId: string, certificateId: string) {
     const certificate = await this.prisma.certificate.findFirst({
-      where: { id: certificateId, registration: { userId } },
+      where: {
+        id: certificateId,
+        registration: { userId },
+      },
     });
+
     if (!certificate) {
       throw new NotFoundException('Certificate not found.');
     }
+
     return certificate;
   }
 
-  findForOrganizer(organizationId: string, certificateId: string) {
-    return this.assertCertificateInOrganization(organizationId, certificateId);
+  /**
+   * Returns only the current participant's certificates.
+   */
+  async findMine(userId: string) {
+    return this.prisma.certificate.findMany({
+      where: {
+        registration: { userId },
+      },
+      include: {
+        conference: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   }
 
-  /** Public verification, SRS §18: minimum fields only — never the raw Registration/User record. */
+
+async getMyConferenceFeedback(userId: string, conferenceId: string) {
+  const registration = await this.prisma.registration.findFirst({
+    where: { userId, conferenceId },
+    select: { id: true },
+  });
+
+  if (!registration) {
+    throw new NotFoundException(
+      'Registration for this conference was not found.',
+    );
+  }
+
+  return this.prisma.conferenceFeedback.findUnique({
+    where: {
+      conferenceId_userId: { conferenceId, userId },
+    },
+  });
+}
+
+
+async submitConferenceFeedback(
+  userId: string,
+  conferenceId: string,
+  input: {
+    rating: number;
+    contentRating: string;
+    comments?: string;
+  },
+) {
+  if (
+    !Number.isInteger(input.rating) ||
+    input.rating < 1 ||
+    input.rating > 5
+  ) {
+    throw new BadRequestException('Rating must be between 1 and 5.');
+  }
+
+  const allowedContentRatings = [
+    'Excellent',
+    'Good',
+    'Average',
+    'Needs improvement',
+  ];
+
+  if (!allowedContentRatings.includes(input.contentRating)) {
+    throw new BadRequestException('Invalid content rating.');
+  }
+
+  const registration = await this.prisma.registration.findFirst({
+    where: { userId, conferenceId },
+    select: { id: true },
+  });
+
+  if (!registration) {
+    throw new NotFoundException(
+      'Registration for this conference was not found.',
+    );
+  }
+
+  const existing = await this.prisma.conferenceFeedback.findUnique({
+    where: {
+      conferenceId_userId: { conferenceId, userId },
+    },
+  });
+
+  if (existing) {
+    throw new ConflictException(
+      'Feedback has already been submitted for this conference.',
+    );
+  }
+
+  const feedback = await this.prisma.conferenceFeedback.create({
+    data: {
+      conferenceId,
+      userId,
+      rating: input.rating,
+      contentRating: input.contentRating,
+      comments: input.comments?.trim() || null,
+    },
+  });
+
+  const conference = await this.prisma.conference.findUnique({
+    where: { id: conferenceId },
+    select: {
+      id: true,
+      name: true,
+      organizationId: true,
+    },
+  });
+
+  if (conference) {
+    this.eventEmitter.emit(
+      NOTIFICATION_EVENTS.CONFERENCE_FEEDBACK_SUBMITTED,
+      {
+        organizationId: conference.organizationId,
+        conferenceId: conference.id,
+        userId,
+        templateData: {
+          conferenceName: conference.name,
+          certificatesUrl: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/certificates`,
+        },
+        entityType: 'conference_feedback',
+        entityId: feedback.id,
+      },
+    );
+  }
+
+  return feedback;
+}
+
+
+  findForOrganizer(
+    organizationId: string,
+    certificateId: string,
+  ) {
+    return this.assertCertificateInOrganization(
+      organizationId,
+      certificateId,
+    );
+  }
+
+  /**
+   * Public verification returns only the necessary certificate details.
+   */
   async verifyByCode(code: string) {
     const certificate = await this.prisma.certificate.findUnique({
       where: { verificationCode: code },
-      include: { conference: true, registration: { include: { user: true } } },
+      include: {
+        conference: true,
+        registration: {
+          include: { user: true },
+        },
+      },
     });
+
     if (!certificate || certificate.status !== 'ISSUED') {
       throw new NotFoundException('Certificate not found.');
     }
@@ -196,7 +583,9 @@ export class CertificatesService {
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: certificate.conferenceId },
     });
+
     const { firstName, lastName } = certificate.registration.user;
+
     const holderName = this.resolveHolderName(
       settings?.certificateShowFullName ?? true,
       firstName,
@@ -219,10 +608,20 @@ export class CertificatesService {
     certificateType: string,
   ) {
     let sequence =
-      (await this.prisma.certificate.count({ where: { conferenceId } })) + 1;
+      (await this.prisma.certificate.count({
+        where: { conferenceId },
+      })) + 1;
 
-    for (let attempt = 0; attempt < MAX_NUMBER_ATTEMPTS; attempt++) {
-      const certificateNumber = formatSequenceNumber('CERT', sequence);
+    for (
+      let attempt = 0;
+      attempt < MAX_NUMBER_ATTEMPTS;
+      attempt++
+    ) {
+      const certificateNumber = formatSequenceNumber(
+        'CERT',
+        sequence,
+      );
+
       try {
         return await this.prisma.certificate.create({
           data: {
@@ -239,6 +638,7 @@ export class CertificatesService {
           sequence += 1;
           continue;
         }
+
         throw error;
       }
     }
@@ -263,12 +663,22 @@ export class CertificatesService {
     certificateId: string,
   ) {
     const certificate = await this.prisma.certificate.findFirst({
-      where: { id: certificateId, conference: { organizationId } },
-      include: { registration: { include: { user: true } }, conference: true },
+      where: {
+        id: certificateId,
+        conference: { organizationId },
+      },
+      include: {
+        registration: {
+          include: { user: true },
+        },
+        conference: true,
+      },
     });
+
     if (!certificate) {
       throw new NotFoundException('Certificate not found.');
     }
+
     return certificate;
   }
 
@@ -277,8 +687,12 @@ export class CertificatesService {
     conferenceId: string,
   ): Promise<void> {
     const conference = await this.prisma.conference.findFirst({
-      where: { id: conferenceId, organizationId },
+      where: {
+        id: conferenceId,
+        organizationId,
+      },
     });
+
     if (!conference) {
       throw new NotFoundException('Conference not found.');
     }

@@ -1,3 +1,4 @@
+
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ReviewersService } from './reviewers.service';
 import type { PrismaService } from '../common/prisma/prisma.service';
@@ -13,20 +14,25 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     reviewerProfile: { upsert: jest.fn() },
     user: { findUnique: jest.fn() },
   };
+
   const baseRecord = base as unknown as Record<
     string,
     Record<string, jest.Mock>
   >;
+
   for (const [model, methods] of Object.entries(overrides)) {
     Object.assign(baseRecord[model], methods);
   }
+
   return base as unknown as PrismaService;
 }
 
 describe('ReviewersService.addReviewer', () => {
   it('rejects adding the same user as a reviewer twice in one organization', async () => {
     const prisma = fakePrisma({
-      reviewer: { findUnique: jest.fn().mockResolvedValue({ id: 'existing' }) },
+      reviewer: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'existing' }),
+      },
     });
 
     await expect(
@@ -45,7 +51,12 @@ describe('ReviewersService.addReviewer', () => {
     });
 
     expect(create).toHaveBeenCalledWith({
-      data: { organizationId: 'org-1', userId: 'user-1', status: 'ACTIVE' },
+      data: {
+        organizationId: 'org-1',
+        userId: 'user-1',
+        status: 'ACTIVE',
+      },
+      include: { profile: true },
     });
   });
 
@@ -65,7 +76,12 @@ describe('ReviewersService.addReviewer', () => {
     });
 
     expect(create).toHaveBeenCalledWith({
-      data: { organizationId: 'org-1', userId: 'user-2', status: 'ACTIVE' },
+      data: {
+        organizationId: 'org-1',
+        userId: 'user-2',
+        status: 'ACTIVE',
+      },
+      include: { profile: true },
     });
   });
 
@@ -99,6 +115,7 @@ describe('ReviewersService.updateProfile', () => {
     const upsert = jest
       .fn()
       .mockResolvedValue({ reviewerId: 'reviewer-1', institution: 'AIIMS' });
+
     const prisma = fakePrisma({
       reviewer: {
         findFirst: jest

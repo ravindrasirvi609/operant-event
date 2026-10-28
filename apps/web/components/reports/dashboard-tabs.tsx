@@ -37,7 +37,7 @@ export function DashboardTabs({ conferenceId }: { conferenceId: string }) {
 
   return (
     <div className="space-y-4">
-      <nav className="flex gap-4 border-b">
+      <nav className="flex gap-2 overflow-x-auto border-b sm:gap-4">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -70,7 +70,7 @@ function ConferenceOverviewTab({ conferenceId }: { conferenceId: string }) {
   return (
     <AsyncBoundary query={query}>
       {(data) => (
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatTile label="Abstracts" value={data.totalAbstracts} />
           <StatTile label="Registrations" value={data.totalRegistrations} />
           <StatTile label="Revenue" value={data.totalRevenue} />
@@ -109,7 +109,7 @@ function RegistrationTab({ conferenceId }: { conferenceId: string }) {
   return (
     <AsyncBoundary query={query}>
       {(data) => (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
           <div>
             <h3 className="mb-2 text-xs font-medium text-muted-foreground">By status</h3>
             <BreakdownBars data={data.byStatus} />
@@ -130,7 +130,7 @@ function RevenueTab({ conferenceId }: { conferenceId: string }) {
     <AsyncBoundary query={query}>
       {(data) => (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <StatTile label="Collected" value={data.totalCollected} />
             <StatTile label="Refunded" value={data.totalRefunded} />
           </div>

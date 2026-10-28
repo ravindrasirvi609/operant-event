@@ -6,19 +6,43 @@ export const REVIEW_ASSIGNMENT_STATUSES = [
   'OVERDUE',
   'CANCELLED',
 ] as const;
-export type ReviewAssignmentStatus = (typeof REVIEW_ASSIGNMENT_STATUSES)[number];
 
-export const REVIEW_RECOMMENDATIONS = ['ACCEPT', 'REJECT', 'MINOR_REVISION', 'MAJOR_REVISION'] as const;
-export type ReviewRecommendation = (typeof REVIEW_RECOMMENDATIONS)[number];
+export type ReviewAssignmentStatus =
+  (typeof REVIEW_ASSIGNMENT_STATUSES)[number];
 
-export const DECISION_TYPES = ['ACCEPTED', 'REJECTED', 'REVISION_REQUIRED', 'WAITLISTED'] as const;
-export type DecisionType = (typeof DECISION_TYPES)[number];
+export const REVIEW_RECOMMENDATIONS = [
+  'ACCEPT',
+  'REJECT',
+  'MINOR_REVISION',
+  'MAJOR_REVISION',
+] as const;
+
+export type ReviewRecommendation =
+  (typeof REVIEW_RECOMMENDATIONS)[number];
+
+export const DECISION_TYPES = [
+  'ACCEPTED',
+  'REJECTED',
+  'REVISION_REQUIRED',
+  'WAITLISTED',
+] as const;
+
+export type DecisionType =
+  (typeof DECISION_TYPES)[number];
+
+export interface ReviewerUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}
 
 export interface Reviewer {
   id: string;
   organizationId: string;
   userId: string;
   status: string;
+  user: ReviewerUser;
   profile: ReviewerProfile | null;
 }
 
@@ -47,8 +71,8 @@ export interface Review {
 /**
  * Mirrors ReviewerAbstractProjection exactly — `submittedBy` is present
  * ONLY when the conference's reviewMode is 'OPEN'; in every other case
- * (including no settings row at all) the key is genuinely absent from
- * the response, not null.
+ * (including no settings row at all) the key is genuinely absent
+ * from the response, not null.
  */
 export interface ReviewerAbstractProjection {
   id: string;
@@ -63,7 +87,10 @@ export interface ConflictCheckResult {
   reasons: string[];
 }
 
-/** `GET conferences/:conferenceId/abstracts/:abstractId/reviews` — every assignment for the abstract with its review, if submitted. */
+/**
+ * GET conferences/:conferenceId/abstracts/:abstractId/reviews
+ * Every assignment for the abstract with its review, if submitted.
+ */
 export interface AbstractReviewAssignment {
   id: string;
   status: ReviewAssignmentStatus;

@@ -11,6 +11,7 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
     sessionSpeaker: { findFirst: jest.fn() },
     reviewer: { findFirst: jest.fn() },
     review: { count: jest.fn() },
+    reviewAssignment: { count: jest.fn() },
     checkin: { findFirst: jest.fn() },
   };
   const baseRecord = base as unknown as Record<
@@ -164,7 +165,7 @@ describe('CertificateEligibilityService.isEligible — REVIEWER', () => {
           .fn()
           .mockResolvedValue({ certificateReviewThreshold: 2 }),
       },
-      review: { count: jest.fn().mockResolvedValue(2) },
+      reviewAssignment: { count: jest.fn().mockResolvedValue(2) },
     });
     const service = new CertificateEligibilityService(prisma, fakeAttendance());
 
@@ -215,7 +216,10 @@ describe('CertificateEligibilityService.isEligible — CHAIR', () => {
       where: {
         speakerId: 'speaker-1',
         role: { in: ['CHAIR', 'CO_CHAIR'] },
-        session: { status: 'PUBLISHED' },
+        session: {
+  conferenceId: 'conf-1',
+  status: 'PUBLISHED',
+},
       },
     });
   });

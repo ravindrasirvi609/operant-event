@@ -56,9 +56,10 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
 
 function fakeMailer(): AuthMailer {
   return {
-    sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-    sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-  };
+  sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+  sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+  sendOrganizationInvitation: jest.fn().mockResolvedValue(undefined),
+};
 }
 
 function buildService(
@@ -136,11 +137,15 @@ describe('OrganizationsService.create', () => {
       }),
     );
     expect(tokenCreate).toHaveBeenCalledTimes(1);
-    expect(mailer.sendPasswordReset).toHaveBeenCalledTimes(1);
-    expect(mailer.sendPasswordReset).toHaveBeenCalledWith(
-      { email: 'owner@example.com', firstName: 'Alice' },
-      expect.any(String),
-    );
+    expect(mailer.sendOrganizationInvitation).toHaveBeenCalledTimes(1);
+expect(mailer.sendOrganizationInvitation).toHaveBeenCalledWith(
+  { email: 'owner@example.com', firstName: 'Alice' },
+  expect.any(String),
+  {
+    organizationName: 'APTICON',
+    roleName: 'Organization Owner',
+  },
+);
   });
 
   it('uses the caller-supplied slug instead of deriving one from the name when given', async () => {
@@ -265,16 +270,29 @@ describe('OrganizationsService.update', () => {
   });
 });
 
+
 describe('OrganizationsService.inviteMember', () => {
   it('creates a membership for an existing user without sending a set-password email', async () => {
-    const existingUser = { id: 'user-2', email: 'reviewer@example.com' };
+    const existingUser = {
+      id: 'user-2',
+      email: 'reviewer@example.com',
+      firstName: 'Reviewer',
+    };
+
     const membershipCreate = jest
       .fn()
       .mockResolvedValue({ id: 'membership-2' });
+
     const mailer = fakeMailer();
+
     const prisma = fakePrisma({
-      user: { findUnique: jest.fn().mockResolvedValue(existingUser) },
-      organizationMembership: { create: membershipCreate },
+      user: {
+        findUnique: jest.fn().mockResolvedValue(existingUser),
+      },
+      organizationMembership: {
+        create: membershipCreate,
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
     });
 
     await buildService(prisma, mailer).inviteMember('org-1', {
@@ -289,28 +307,53 @@ describe('OrganizationsService.inviteMember', () => {
         organizationId: 'org-1',
         userId: 'user-2',
         status: 'INVITED',
-        roles: { create: [{ roleId: 'role-reviewer' }] },
+        roles: {
+          create: [{ roleId: 'role-reviewer' }],
+        },
       },
     });
+
     expect(mailer.sendPasswordReset).not.toHaveBeenCalled();
+    expect(mailer.sendOrganizationInvitation).not.toHaveBeenCalled();
   });
 
-  it('creates a brand-new user with an unusable password and emails a set-password link', async () => {
-    const userCreate = jest
-      .fn()
-      .mockResolvedValue({ id: 'user-3', email: 'new@example.com' });
+  it('creates a brand-new user and sends a branded organization invitation', async () => {
+    const userCreate = jest.fn().mockResolvedValue({
+      id: 'user-3',
+      email: 'new@example.com',
+      firstName: 'New',
+    });
+
     const membershipCreate = jest
       .fn()
       .mockResolvedValue({ id: 'membership-3' });
+
     const tokenCreate = jest.fn().mockResolvedValue(undefined);
+
     const mailer = fakeMailer();
+
     const prisma = fakePrisma({
       user: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: userCreate,
       },
-      organizationMembership: { create: membershipCreate },
-      passwordResetToken: { create: tokenCreate },
+      organizationMembership: {
+        create: membershipCreate,
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      passwordResetToken: {
+        create: tokenCreate,
+      },
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({
+          name: 'APTICON',
+        }),
+      },
+      role: {
+        findMany: jest.fn().mockResolvedValue([
+          { name: 'Conference Admin' },
+        ]),
+      },
     });
 
     await buildService(prisma, mailer).inviteMember('org-1', {
@@ -328,10 +371,26 @@ describe('OrganizationsService.inviteMember', () => {
         }),
       }),
     );
+
     expect(tokenCreate).toHaveBeenCalledTimes(1);
-    expect(mailer.sendPasswordReset).toHaveBeenCalledTimes(1);
+    expect(membershipCreate).toHaveBeenCalledTimes(1);
+
+    expect(mailer.sendOrganizationInvitation).toHaveBeenCalledWith(
+      {
+        email: 'new@example.com',
+        firstName: 'New',
+      },
+      expect.any(String),
+      {
+        organizationName: 'APTICON',
+        roleName: 'Conference Admin',
+      },
+    );
+
+    expect(mailer.sendPasswordReset).not.toHaveBeenCalled();
   });
 });
+
 
 describe('OrganizationsService.updateMembershipStatus', () => {
   it('updates the membership status', async () => {

@@ -55,9 +55,10 @@ function fakePrisma(overrides: Record<string, Record<string, jest.Mock>> = {}) {
 
 function fakeMailer(): AuthMailer {
   return {
-    sendEmailVerification: jest.fn().mockResolvedValue(undefined),
-    sendPasswordReset: jest.fn().mockResolvedValue(undefined),
-  };
+  sendEmailVerification: jest.fn().mockResolvedValue(undefined),
+  sendPasswordReset: jest.fn().mockResolvedValue(undefined),
+  sendOrganizationInvitation: jest.fn().mockResolvedValue(undefined),
+};
 }
 
 function buildService(

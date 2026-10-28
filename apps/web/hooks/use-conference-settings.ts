@@ -1,8 +1,19 @@
+
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+
 import { apiGet, apiPut } from '@/lib/api/client';
-import type { ConferenceSetting, ReviewMode } from '@/lib/conferences/types';
+
+import type {
+  CertificateTemplateFieldPositions,
+  ConferenceSetting,
+  ReviewMode,
+} from '@/lib/conferences/types';
 
 function settingsQueryKey(conferenceId: string) {
   return ['conferences', conferenceId, 'settings'];
@@ -22,21 +33,29 @@ const DEFAULT_SETTINGS: Omit<ConferenceSetting, 'conferenceId'> = {
   manualPaymentInstructions: null,
   certificateEnabled: false,
   checkinEnabled: false,
+
+  certificateTemplateFileId: null,
+  certificateTemplateMimeType: null,
+  certificateTemplateUpdatedAt: null,
+  certificateTemplateFieldPositions: null,
 };
 
 /**
- * `GET .../settings` returns `null` (200, not 404) for a conference that
- * has never had its settings saved — `upsert` is how the backend models
- * "first save" too, so the frontend just fills in the same defaults the
- * Prisma model itself defaults to, rather than showing a separate
- * empty/create state before the same form.
+ * Loads conference settings.
+ * If settings have not been created yet, returns frontend defaults.
  */
 export function useConferenceSettings(conferenceId: string) {
   return useQuery({
     queryKey: settingsQueryKey(conferenceId),
     queryFn: async () => {
-      const settings = await apiGet<ConferenceSetting | null>(`conferences/${conferenceId}/settings`);
-      return settings ?? { conferenceId, ...DEFAULT_SETTINGS };
+      const settings = await apiGet<ConferenceSetting | null>(
+        `conferences/${encodeURIComponent(conferenceId)}/settings`,
+      );
+
+      return settings ?? {
+        conferenceId,
+        ...DEFAULT_SETTINGS,
+      };
     },
     enabled: Boolean(conferenceId),
   });
@@ -55,15 +74,24 @@ export interface UpdateConferenceSettingsInput {
   manualPaymentInstructions?: string;
   certificateEnabled?: boolean;
   checkinEnabled?: boolean;
+
+  certificateTemplateFieldPositions?: CertificateTemplateFieldPositions;
 }
 
 export function useUpdateConferenceSettings(conferenceId: string) {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (input: UpdateConferenceSettingsInput) =>
-      apiPut<ConferenceSetting>(`conferences/${conferenceId}/settings`, input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: settingsQueryKey(conferenceId) });
+      apiPut<ConferenceSetting>(
+        `conferences/${encodeURIComponent(conferenceId)}/settings`,
+        input,
+      ),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: settingsQueryKey(conferenceId),
+      });
     },
   });
 }

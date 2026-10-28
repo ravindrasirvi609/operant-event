@@ -130,4 +130,13 @@ docker-compose.override.yml
 # ==========================================
 
 Thumbs.db
-ehthumbs.db
+ehthumbs.db*.dump
+*.bak
+clear-operant-event-data.sql
+payments_backup_safety.sql
+apps/api/inspect-payments.*
+apps/api/notification-test.*
+apps/api/reset-test-password.*
+packages/database/conference-read-check.cjs
+
+*.dump

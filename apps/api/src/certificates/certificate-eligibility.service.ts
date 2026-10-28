@@ -1,3 +1,4 @@
+
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
@@ -41,18 +42,22 @@ export class CertificateEligibilityService {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
     });
+
     if (
       !registration ||
       !PARTICIPATION_ELIGIBLE_STATUSES.includes(registration.status)
     ) {
       return false;
     }
+
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: registration.conferenceId },
     });
+
     const threshold = settings?.certificateAttendanceThreshold ?? 1;
     const attendanceCount =
       await this.attendanceService.countForRegistration(registrationId);
+
     return attendanceCount >= threshold;
   }
 
@@ -62,121 +67,198 @@ export class CertificateEligibilityService {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
     });
+
     if (!registration) {
       return false;
     }
-    const presented = await this.prisma.abstract.findFirst({
+
+    // Abstract-based presentation.
+    const presentedAbstract = await this.prisma.abstract.findFirst({
       where: {
         conferenceId: registration.conferenceId,
         submittedBy: registration.userId,
         status: 'PRESENTED',
       },
     });
-    return presented !== null;
-  }
 
-  private async isSpeakerEligible(registrationId: string): Promise<boolean> {
-    const registration = await this.prisma.registration.findUnique({
-      where: { id: registrationId },
-    });
-    if (!registration) {
-      return false;
+    if (presentedAbstract) {
+      return true;
     }
+
+    // Presentation assigned to a speaker in a published programme session.
     const speaker = await this.prisma.speaker.findFirst({
       where: {
         conferenceId: registration.conferenceId,
         userId: registration.userId,
       },
     });
+
     if (!speaker) {
       return false;
     }
-    const publishedAssignment = await this.prisma.sessionSpeaker.findFirst({
-      where: { speakerId: speaker.id, session: { status: 'PUBLISHED' } },
+
+    const presentation =
+      await this.prisma.presentationAssignment.findFirst({
+        where: {
+          speakerId: speaker.id,
+          session: {
+            conferenceId: registration.conferenceId,
+            status: 'PUBLISHED',
+          },
+        },
+      });
+
+    return presentation !== null;
+  }
+
+  private async isSpeakerEligible(
+    registrationId: string,
+  ): Promise<boolean> {
+    const registration = await this.prisma.registration.findUnique({
+      where: { id: registrationId },
     });
+
+    if (!registration) {
+      return false;
+    }
+
+    const speaker = await this.prisma.speaker.findFirst({
+      where: {
+        conferenceId: registration.conferenceId,
+        userId: registration.userId,
+      },
+    });
+
+    if (!speaker) {
+      return false;
+    }
+
+    const publishedAssignment = await this.prisma.sessionSpeaker.findFirst({
+      where: {
+        speakerId: speaker.id,
+        session: {
+          conferenceId: registration.conferenceId,
+          status: 'PUBLISHED',
+        },
+      },
+    });
+
     return publishedAssignment !== null;
   }
 
-  private async isReviewerEligible(registrationId: string): Promise<boolean> {
+  private async isReviewerEligible(
+    registrationId: string,
+  ): Promise<boolean> {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
       include: { conference: true },
     });
+
     if (!registration) {
       return false;
     }
+
     const reviewer = await this.prisma.reviewer.findFirst({
       where: {
         organizationId: registration.conference.organizationId,
         userId: registration.userId,
       },
     });
+
     if (!reviewer) {
       return false;
     }
+
     const settings = await this.prisma.conferenceSetting.findUnique({
       where: { conferenceId: registration.conferenceId },
     });
+
     const threshold = settings?.certificateReviewThreshold ?? 1;
-    const reviewCount = await this.prisma.review.count({
+
+    const reviewCount = await this.prisma.reviewAssignment.count({
       where: {
-        assignment: {
-          reviewerId: reviewer.id,
-          abstract: { conferenceId: registration.conferenceId },
+        reviewerId: reviewer.id,
+        conferenceId: registration.conferenceId,
+        status: 'COMPLETED',
+        review: {
+          isNot: null,
+        },
+        abstract: {
+          conferenceId: registration.conferenceId,
         },
       },
     });
+
     return reviewCount >= threshold;
   }
 
-  private async isChairEligible(registrationId: string): Promise<boolean> {
+  private async isChairEligible(
+    registrationId: string,
+  ): Promise<boolean> {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
     });
+
     if (!registration) {
       return false;
     }
+
     const speaker = await this.prisma.speaker.findFirst({
       where: {
         conferenceId: registration.conferenceId,
         userId: registration.userId,
       },
     });
+
     if (!speaker) {
       return false;
     }
+
     const chairAssignment = await this.prisma.sessionSpeaker.findFirst({
       where: {
         speakerId: speaker.id,
         role: { in: CHAIR_ROLES },
-        session: { status: 'PUBLISHED' },
+        session: {
+          conferenceId: registration.conferenceId,
+          status: 'PUBLISHED',
+        },
       },
     });
+
     return chairAssignment !== null;
   }
 
   /**
-   * "Workshop-category registration" is inferred from the registration's
-   * category name (no dedicated isWorkshop flag exists on
-   * RegistrationCategory) — a category named e.g. "Workshop Pass".
+   * Workshop eligibility is inferred from the registration category name
+   * and requires a WORKSHOP check-in.
    */
-  private async isWorkshopEligible(registrationId: string): Promise<boolean> {
+  private async isWorkshopEligible(
+    registrationId: string,
+  ): Promise<boolean> {
     const registration = await this.prisma.registration.findUnique({
       where: { id: registrationId },
       include: { registrationType: { include: { category: true } } },
     });
+
     if (!registration) {
       return false;
     }
+
     const isWorkshopCategory = registration.registrationType.category.name
       .toLowerCase()
       .includes('workshop');
+
     if (!isWorkshopCategory) {
       return false;
     }
+
     const workshopCheckin = await this.prisma.checkin.findFirst({
-      where: { registrationId, checkinType: 'WORKSHOP' },
+      where: {
+        registrationId,
+        checkinType: 'WORKSHOP',
+      },
     });
+
     return workshopCheckin !== null;
   }
 }

@@ -34,7 +34,10 @@ describe('PaymentModeBranch', () => {
   });
 
   it('renders manual payment instructions and proof upload when the response carries manualPaymentInstructions', () => {
-    const result: CreateOrderResult = { order, manualPaymentInstructions: true };
+const result: CreateOrderResult = {
+  order,
+  manualPaymentInstructions: 'Transfer payment to the organizer bank account.',
+};
     renderWithQueryClient(<PaymentModeBranch orderResult={result} orderId={order.id} />);
 
     expect(screen.getByText(/manual payment/i)).toBeInTheDocument();

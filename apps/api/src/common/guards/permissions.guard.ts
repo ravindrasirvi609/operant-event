@@ -1,3 +1,4 @@
+
 import {
   CanActivate,
   ExecutionContext,
@@ -8,6 +9,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
+import { ALLOW_SUPER_ADMIN_KEY } from '../decorators/allow-super-admin.decorator';
 import {
   hasPermission,
   resolveEffectivePermissions,
@@ -16,12 +18,6 @@ import type { AuthenticatedRequest } from '../types/authenticated-request';
 
 export const ORGANIZATION_HEADER = 'x-organization-id';
 
-/**
- * Resolves the caller's acting organization from the X-Organization-Id
- * header, loads their membership + effective permissions in one query, and
- * (if the handler carries @RequirePermissions) enforces them. Runs after
- * JwtAuthGuard, which is what populates request.user.
- */
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
@@ -30,25 +26,64 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.get<string[] | undefined>(
-      PERMISSIONS_KEY,
-      context.getHandler(),
-    );
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const handler = context.getHandler();
+const controller = context.getClass();
 
+const requiredPermissions = this.reflector.getAllAndOverride<
+  string[] | undefined
+>(PERMISSIONS_KEY, [handler, controller]);
+
+const allowSuperAdmin = this.reflector.getAllAndOverride<boolean>(
+  ALLOW_SUPER_ADMIN_KEY,
+  [handler, controller],
+);
+
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const userId = request.user?.id;
+
     if (!userId) {
       throw new UnauthorizedException('Authentication required.');
     }
 
     const organizationHeader = request.headers[ORGANIZATION_HEADER];
+
     if (!organizationHeader || typeof organizationHeader !== 'string') {
       throw new ForbiddenException(`Missing ${ORGANIZATION_HEADER} header.`);
     }
+
     const organizationId = organizationHeader;
 
+    // Explicitly marked endpoints may allow a verified platform Super Admin.
+    if (allowSuperAdmin) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { isSuperAdmin: true },
+      });
+
+      if (user?.isSuperAdmin) {
+        const organization = await this.prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { status: true },
+        });
+
+        if (!organization || organization.status !== 'ACTIVE') {
+          throw new ForbiddenException(
+            'This organization does not exist or is not active.',
+          );
+        }
+
+        request.organizationId = organizationId;
+        request.effectivePermissions = new Set<string>();
+
+        return true;
+      }
+    }
+
+    // Normal users must still have an active membership.
     const membership = await this.prisma.organizationMembership.findUnique({
-      where: { organizationId_userId: { organizationId, userId } },
+      where: {
+        organizationId_userId: { organizationId, userId },
+      },
       include: {
         organization: { select: { status: true } },
         roles: {
@@ -71,10 +106,6 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    // A Super Admin can suspend an organization (OrganizationsController's
-    // updateStatus route) — once suspended, every permission-gated action
-    // across the whole app is blocked here, in one place, regardless of the
-    // caller's own role or permissions within that organization.
     if (membership.organization.status !== 'ACTIVE') {
       throw new ForbiddenException(
         'This organization is not active. Contact your platform administrator.',
@@ -86,6 +117,7 @@ export class PermissionsGuard implements CanActivate {
         (rolePermission) => rolePermission.permission,
       ),
     );
+
     const effectivePermissions = resolveEffectivePermissions(permissionRefs);
 
     request.organizationId = organizationId;
@@ -98,6 +130,7 @@ export class PermissionsGuard implements CanActivate {
     const missing = requiredPermissions.filter(
       (permission) => !hasPermission(effectivePermissions, permission),
     );
+
     if (missing.length > 0) {
       throw new ForbiddenException(
         `Missing required permission(s): ${missing.join(', ')}`,

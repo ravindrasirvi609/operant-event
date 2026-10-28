@@ -35,6 +35,16 @@ export class OrdersController {
   ) {
     return this.ordersService.create(user.id, registrationId, dto.provider);
   }
+  @Get()
+findForRegistration(
+  @CurrentUser() user: AuthenticatedUser,
+  @Param('registrationId') registrationId: string,
+) {
+  return this.ordersService.findForRegistration(
+    user.id,
+    registrationId,
+  );
+}
 }
 
 /**

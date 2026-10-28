@@ -84,15 +84,19 @@ export default function NewOrganizationPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Create an organization</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="mx-auto w-full max-w-3xl space-y-1">
+  <h1 className="text-xl font-semibold">Create an organization</h1>
+  <p className="text-sm text-muted-foreground">
           Provision a new organization and designate its first owner. If the owner does not
           yet have an account, one will be created and they will receive a set-password email.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="max-w-md space-y-4" noValidate>
+      <form
+  onSubmit={handleSubmit(onSubmit)}
+  className="mx-auto w-full max-w-3xl space-y-6 rounded-2xl border bg-card p-6 shadow-md sm:p-8"
+  noValidate
+>
         {/* ── Organization details ──────────────────────────────────────────── */}
         <FormField label="Organization name" htmlFor="name" error={errors.name?.message}>
           <Input id="name" {...register('name')} />
